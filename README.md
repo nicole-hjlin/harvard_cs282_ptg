@@ -1,1 +1,3 @@
-# harvard_cs282_explainability
+# Harvard COMPSCI 282BR: Topics in Machine Learning: Interpretability and Explainability
+
+Class project
