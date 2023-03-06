@@ -7,7 +7,10 @@ To do list:
 - [ ] Implement training of other models/datasets (optional?)
 - [ ] Evaluate performance against singleton models
 
+
 ```
+$ python -m pip install -r requirements.txt
+$ wandb login
 $ python main.py --help
 usage: main.py [-h] [--experiment EXPERIMENT] [--n N] [--a A] [--lr LR] [--epochs EPOCHS] [--batch_size BATCH_SIZE] [--dropout DROPOUT]
 
