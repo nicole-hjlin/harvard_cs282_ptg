@@ -20,9 +20,19 @@ def train_ensemble(
     S: list[State],
     n: int,
 ):
-    # for i in range(n):
-    #     wandb.run =f'{wandb.config.experiment}{}
-    return [P(S[i]) for i in range(n)]
+    g = []
+    config = wandb.config
+    for i in range(n):
+        wandb.init(
+            project='ptg-baseline',
+            group=config['experiment'],
+            name=f'model{i}',
+            config=config,
+        )
+        g.append(P(S[i]))
+        wandb.finish()
+    # g = [P(S[i]) for i in range(n)]
+    return g
 
 def sample_ensemble(
     P: LearningPipeline,
@@ -37,8 +47,7 @@ def predict_ensemble(
     a: float,
     x: torch.Tensor,
 ):
-    {net.eval() for net in g}
-    y_pred = sum(net(x) for net in g)
+    y_pred = sum(net.eval()(x) for net in g)
     p = -1 # idk what the paper means here
     if p < a:
         return y_pred.argmax(-1)
