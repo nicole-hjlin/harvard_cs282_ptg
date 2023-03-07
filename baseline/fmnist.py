@@ -1,11 +1,12 @@
 from util import State
+import torch
 from torch import optim, nn
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 import wandb
 
-trainset = datasets.FashionMNIST(
+dataset = datasets.FashionMNIST(
     'MNIST_data/',
     download=True,
     train=True,
@@ -13,8 +14,16 @@ trainset = datasets.FashionMNIST(
 )
 
 def state_sampler() -> State:
+    if wandb.config['loo']:
+        torch.seed()
+        mask = torch.randperm(len(dataset))
+        trainset = Subset(dataset, mask[:int(0.9 * len(mask))])
+        torch.manual_seed(0)
+    else:
+        trainset = dataset
+
     return State(
-        LeNet5(num_classes=10, dropout=0.1),
+        LeNet5(num_classes=10, dropout=wandb.config['dropout']),
         trainset,
         wandb.config,
     )
