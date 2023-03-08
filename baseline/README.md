@@ -41,6 +41,6 @@ options:
 
 FASRC clusters module requirements
 ```
-module load Anaconda3/2020.11
+module load python/3.9.12-fasrc01
 module load GCC/8.2.0-2.31.1
 ```
