@@ -11,9 +11,9 @@ To do list:
 - - [ ] FMNIST: Train 200 models for RS, 200 models for LOO
 - - [ ] Tabular: Train 500 models for RS, 500 models for LOO (optional?)
 - [ ] Implement performance metrics
-- - [ ] Singleton model accuracy (Table 1, RS & LOO, mean +- std. dev)
+- - [ ] Singleton model accuracy (Table 1)
 - - [ ] Flip probability (Table 2, Figure 3)
-- - [ ] Selective ensemble accuracy + abstention rates (Table 3, RS & LOO)
+- - [ ] Selective ensemble accuracy + abstention rates (Table 3)
 - - [ ] Structural Similarity (SSIM) metric (Figure 3, Table 4)
 - - [ ] Pearson's Correlation Coefficient (r) (Table 4)
 - [ ] Evaluate ensemble against singleton models
