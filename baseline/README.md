@@ -38,3 +38,9 @@ options:
                         batch size
   --dropout DROPOUT     dropout rate
 ```
+
+FASRC clusters module requirements
+```
+module load Anaconda3/2020.11
+module load GCC/8.2.0-2.31.1
+```
