@@ -4,7 +4,7 @@ This is an implemenation of [Black 2021](https://arxiv.org/abs/2111.08230).
 
 To do list:
 - [x] Implement training of FMNIST
-- - [ ] Features are normalized between 0 and 1
+- - [x] Features are normalized between 0 and 1
 - [ ] Implement training of other models/datasets (optional?)
 - [ ] Add random seed (RS) / Leave-One-Out (LOO) properties to State (?) class
 - [ ] Train and Save Singleton Models
