@@ -9,7 +9,7 @@ To do list:
 - [ ] Add random seed (RS) / Leave-One-Out (LOO) properties to State (?) class
 - [ ] Train and Save Singleton Models
 - - [ ] FMNIST: Train 200 models for RS, 200 models for LOO
-- - [ ] Tabular: Train 500 models for RS, 500 models for LOO
+- - [ ] Tabular: Train 500 models for RS, 500 models for LOO (optional?)
 - [ ] Implement performance metrics
 - - [ ] Accuracy
 - [ ] Evaluate ensemble against singleton models
