@@ -4,11 +4,16 @@ This is an implemenation of [Black 2021](https://arxiv.org/abs/2111.08230).
 
 To do list:
 - [x] Implement training of FMNIST
-- - [ ] Add random seed / loo properties to State (?) class
+- - [ ] Features are normalized between 0 and 1
 - [ ] Implement training of other models/datasets (optional?)
+- [ ] Add random seed (RS) / Leave-One-Out (LOO) properties to State (?) class
+- [ ] Train and Save Singleton Models
+- - [ ] FMNIST: Train 200 models for RS, 200 models for LOO
+- - [ ] Tabular: Train 500 models for RS, 500 models for LOO
 - [ ] Implement performance metrics
+- - [ ] Accuracy
 - [ ] Evaluate ensemble against singleton models
-
+- - [ ] Alpha is 0.05 in main paper
 
 ```
 $ python -m pip install -r requirements.txt
