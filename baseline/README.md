@@ -4,7 +4,7 @@ This is an implemenation of [Black 2021](https://arxiv.org/abs/2111.08230).
 
 To do list:
 - [x] Implement training of FMNIST
-- - [ ] Features are normalized between 0 and 1
+- - [x] Features are normalized between 0 and 1
 - [ ] Implement training of other models/datasets (optional?)
 - [ ] Add random seed (RS) / Leave-One-Out (LOO) properties to State (?) class
 - [ ] Train and Save Singleton Models
@@ -41,6 +41,6 @@ options:
 
 FASRC clusters module requirements
 ```
-module load Anaconda3/2020.11
+module load python/3.9.12-fasrc01
 module load GCC/8.2.0-2.31.1
 ```
