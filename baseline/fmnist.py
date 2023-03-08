@@ -13,6 +13,13 @@ dataset = datasets.FashionMNIST(
     transform=transforms.ToTensor(),
 )
 
+testset = datasets.FashionMNIST(
+    'MNIST_data/',
+    download=True,
+    train=False,
+    transform=transforms.ToTensor(),
+)
+
 def state_sampler() -> State:
     if wandb.config['loo']:
         torch.seed()
@@ -30,8 +37,7 @@ def state_sampler() -> State:
 
 def learning_pipeline(S: State) -> nn.Module:
     S.net.train()
-    wandb.watch(S.net)
-
+    
     loss_fn = nn.CrossEntropyLoss()
     optimizer = optim.SGD(
         S.net.parameters(),
@@ -41,8 +47,11 @@ def learning_pipeline(S: State) -> nn.Module:
         S.trainset,
         batch_size=S.hyperparameters['batch_size'],
     )
-
+    
+    wandb.watch(S.net, loss_fn, log='all', log_freq=1)
     epochs = S.hyperparameters['epochs']
+    print(epochs)
+    print(len(loader))
     with tqdm(total=epochs*len(loader), desc=wandb.run.name) as pbar:
         for _ in range(epochs):
             for i, (x, y) in enumerate(loader):
@@ -52,8 +61,13 @@ def learning_pipeline(S: State) -> nn.Module:
                 loss.backward()
                 optimizer.step()
                 if i % 100 == 0:
-                    wandb.log({'loss': loss})
+                    acc = (y_pred.argmax(-1) == y).float().mean()
+                    wandb.log({
+                        'loss': loss,
+                        'acc': acc,
+                    })
                 pbar.update(1)
+    
 
     return S.net
 

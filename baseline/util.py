@@ -32,7 +32,6 @@ def train_ensemble(
         )
         g.append(P(S[i]))
         wandb.finish()
-    # g = [P(S[i]) for i in range(n)]
     return g
 
 def sample_ensemble(
