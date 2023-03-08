@@ -77,3 +77,12 @@ def SSIM(
     # For now, let's implement it for 2 gradient vectors that are the "feature attributions" for a single input
 
     return -1
+
+
+def pearsonr(
+    grads1: torch.Tensor,
+    grads2: torch.Tensor,
+):
+    # I think we'll literally just use:
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.pearsonr.html
+    return -1
