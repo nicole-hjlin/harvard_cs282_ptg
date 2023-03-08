@@ -47,6 +47,7 @@ def p_flip_ensemble(
 ):
     # Ideally we just have one function that takes in a list of models
     # So we might need a model class for the selective ensemble
+    # We also need a function for the standard ensemble
 
     # Alternatively, modify util/predict_ensemble() to process a whole array of inputs instead of just 1
     # As the inputs above suggest
@@ -58,3 +59,21 @@ def p_flip_ensemble(
     # We'll assume that if all ensembles abstain for one particular input, all predictions are the same for that input
 
     return p_flip_positive.mean()
+
+def accuracy_ensemble():
+    # probably easier to just make an ensemble class so it can be passed as a "single model" to accuracy()
+    # restructure as you wish, we just need to evaluate selective ensembles and standard ensembles (average?)
+    # take in an ensemble and return the mean accuracy, std. dev, and abstention rate
+    return -1
+
+def SSIM(
+    grads1: torch.Tensor,
+    grads2: torch.Tensor,
+):
+    # Structural Similarity (SSIM), varies from -1 to 1
+    # For FMNIST, this replaces Spearman's rank
+    # They use: https://scikit-image.org/docs/stable/auto_examples/transform/plot_ssim.html
+
+    # For now, let's implement it for 2 gradient vectors that are the "feature attributions" for a single input
+
+    return -1
