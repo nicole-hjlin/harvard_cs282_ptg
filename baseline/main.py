@@ -22,5 +22,6 @@ g = util.sample_ensemble(
     n,
 )
 
-for model, i in enumerate(g):
-    torch.save(model.state_dict(), 'checkpoints/model{i}.pt')
+for i, model in enumerate(g):
+    prefix = 'loo_' if config['loo'] else 'rs_'
+    torch.save(model.state_dict(), 'checkpoints/{prefix}model{i}.pt')
