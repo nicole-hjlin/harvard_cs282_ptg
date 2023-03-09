@@ -5,6 +5,7 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 import wandb
+import numpy as np
 
 dataset = datasets.FashionMNIST(
     'MNIST_data/',
@@ -102,3 +103,27 @@ class LeNet5(nn.Module):
         z = self.dropout(z)
         z = self.softmax(self.fc3(z))
         return z
+    
+    def predict(self, x):
+        # takes in tensor or numpy array
+        # shape is (n, 28, 28) or (28, 28)
+        # returns hard predictions (tensor or numpy)
+        # returns the same type as the input
+
+        # Convert input to tensor if it's a numpy array
+        return_numpy = isinstance(x, np.ndarray)
+        x = torch.from_numpy(x) if return_numpy else x
+
+        # Add extra dimension if input is not already a batch
+        x = x.unsqueeze(0) if len(x.shape) == 2 else x
+
+        # Forward pass and argmax for hard prediction
+        with torch.no_grad():  # save memory (inference only)
+            x = x.unsqueeze(1)
+            preds = self.forward(x.float()).argmax(dim=1)  # softmax output
+
+        # Return hard predictions
+        if return_numpy:
+            return preds.detach().numpy()
+        else:
+            return preds
