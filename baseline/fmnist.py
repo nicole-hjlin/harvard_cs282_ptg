@@ -106,20 +106,23 @@ class LeNet5(nn.Module):
     
     def predict(self, x):
         # takes in tensor or numpy array
-        # shape is (n, 28, 28) or (28, 28)
+        # shape is (n, 1, 28, 28) or (n, 28, 28) or (28, 28)
         # returns hard predictions (tensor or numpy)
         # returns the same type as the input
+        # return shape is (n)
 
         # Convert input to tensor if it's a numpy array
         return_numpy = isinstance(x, np.ndarray)
         x = torch.from_numpy(x) if return_numpy else x
 
-        # Add extra dimension if input is not already a batch
-        x = x.unsqueeze(0) if len(x.shape) == 2 else x
+        # Add extra dimension if input is size (28, 28)
+        x = x.unsqueeze(0) if len(x.shape) == 2 else x  # size 2 -> 3
+
+        # Add extra dimension if input is of size (n, 28, 28)
+        x = x.unsqueeze(1) if len(x.shape) == 3 else x  # size 3 -> 4
 
         # Forward pass and argmax for hard prediction
         with torch.no_grad():  # save memory (inference only)
-            x = x.unsqueeze(1)
             preds = self.forward(x.float()).argmax(dim=1)  # softmax output
 
         # Return hard predictions
