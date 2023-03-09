@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 from scipy.stats import binom
 from dataclasses import dataclass
 import wandb
+import os
 
 @dataclass
 class State:
@@ -30,7 +31,11 @@ def train_ensemble(
             name=f'model{i}',
             config=config,
         )
-        g.append(P(S[i]))
+        model = P(S[i])
+        g.append(model)
+        # save model
+        torch.save(model.state_dict(), os.path.join(wandb.run.dir, 'model.pth'))
+
         wandb.finish()
     return g
 

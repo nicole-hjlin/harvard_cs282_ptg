@@ -21,7 +21,3 @@ g = util.sample_ensemble(
     fmnist.state_sampler,
     n,
 )
-
-for i, model in enumerate(g):
-    prefix = 'loo_' if config['loo'] else 'rs_'
-    torch.save(model.state_dict(), f'checkpoints/{prefix}model{i}.pt')
