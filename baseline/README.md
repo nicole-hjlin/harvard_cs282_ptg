@@ -1,23 +1,8 @@
 # Baseline implementation
 
-This is an implemenation of [Black 2021](https://arxiv.org/abs/2111.08230).
+This is an implemenation of [Selective Ensembles for Consistent Predictions (Black et al. 2021)](https://arxiv.org/abs/2111.08230).
 
-To do list:
-- [x] Implement training of FMNIST
-- - [x] Features are normalized between 0 and 1
-- [ ] Implement training of other models/datasets (optional?)
-- [ ] Add random seed (RS) / Leave-One-Out (LOO) properties to State (?) class
-- [ ] Train and Save Singleton Models
-- - [ ] FMNIST: Train 200 models for RS, 200 models for LOO
-- - [ ] Tabular: Train 500 models for RS, 500 models for LOO (optional?)
-- [ ] Implement performance metrics
-- - [ ] Singleton model accuracy (Table 1)
-- - [ ] Flip probability (Table 2, Figure 3)
-- - [ ] Selective ensemble accuracy + abstention rates (Table 3)
-- - [ ] Structural Similarity (SSIM) metric (Figure 3, Table 4)
-- - [ ] Pearson's Correlation Coefficient (r) (Table 4)
-- [ ] Evaluate ensemble against singleton models
-- - [ ] Alpha is 0.05 in main paper
+The following usage of main.py will train 200 models on FMNIST, in the same vein as the paper. Hyperparameters are set by default to those used in the paper, where listed.
 
 ```
 $ python -m pip install -r requirements.txt
