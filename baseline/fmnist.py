@@ -1,4 +1,4 @@
-from util import State
+from util import State, convert_to_tensor
 import torch
 from torch import optim, nn
 from torchvision import datasets, transforms
@@ -104,16 +104,15 @@ class LeNet5(nn.Module):
         z = self.softmax(self.fc3(z))
         return z
     
-    def predict(self, x):
+    def predict(self, x, return_numpy=False):
         # takes in tensor or numpy array
         # shape is (n, 1, 28, 28) or (n, 28, 28) or (28, 28)
         # returns hard predictions (tensor or numpy)
         # returns the same type as the input
-        # return shape is (n)
+        # return shape is (n, 1)
 
         # Convert input to tensor if it's a numpy array
-        return_numpy = isinstance(x, np.ndarray)
-        x = torch.from_numpy(x) if return_numpy else x
+        x = convert_to_tensor(x)
 
         # Add extra dimension if input is size (28, 28)
         x = x.unsqueeze(0) if len(x.shape) == 2 else x  # size 2 -> 3
@@ -122,8 +121,9 @@ class LeNet5(nn.Module):
         x = x.unsqueeze(1) if len(x.shape) == 3 else x  # size 3 -> 4
 
         # Forward pass and argmax for hard prediction
+        self.eval()
         with torch.no_grad():  # save memory (inference only)
-            preds = self.forward(x.float()).argmax(dim=1)  # softmax output
+            preds = self(x.float()).argmax(dim=1)  # softmax output
 
         # Return hard predictions
         if return_numpy:

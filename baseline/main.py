@@ -21,3 +21,11 @@ g = util.sample_ensemble(
     fmnist.state_sampler,
     n,
 )
+
+# The following code can be uncommented when training/saving models locally
+# Note that the models will also still be saved on wandb.
+
+# import torch
+# for i, model in enumerate(g):
+#     prefix = 'loo_' if config['loo'] else 'rs_'
+#     torch.save(model.state_dict(), f'checkpoints/{prefix}model{i}.pth')
