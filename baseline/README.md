@@ -2,7 +2,15 @@
 
 This is an implemenation of [Selective Ensembles for Consistent Predictions (Black et al. 2021)](https://arxiv.org/abs/2111.08230).
 
-The following usage of main.py will train 200 models on FMNIST, in the same vein as the paper. Hyperparameters are set by default to those used in the paper, where listed.
+This paper models randomness in the training process in two ways:
+- The random state (RS) initialization of the network's parameters
+- Leave-one-out (LOO), in which a random datapoint is ommited from the training dataset
+
+We provide code for training on the Fashion-MNIST dataset, or FMNIST, which has 60,000 training inputs. We also randomly remove 10% of these if the --loo flag is provided, as opposed to a single datapoint, in order to gauge more strongly the effects of data removal.
+
+The following usage of main.py will train 200 LeNet5 models on FMNIST, in the same vein as the paper, with default hyperparameters to match those listed in the text. Pre-trained models are also provided in the checkpoints folder.
+
+**The reproduction of experimental results can be executed in the "experiments" notebook.**
 
 ```
 $ python -m pip install -r requirements.txt
