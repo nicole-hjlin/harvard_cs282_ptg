@@ -1,47 +1,90 @@
 import torch
 from torch import nn
-from util import predict_ensemble
+from util import select_preds, convert_to_numpy
+import numpy as np
+from tqdm import tqdm
 
-def accuracy(
+def compute_preds(
     g: list[nn.Module],
-    X_test: torch.Tensor,  # multiple inputs
-    y_test: torch.Tensor,
+    x: torch.Tensor | np.ndarray,
+    return_numpy: bool = False,
 ):
-    # Mean accuracy over n models
-    # Ambiguous in paper- I would evaluate test accuracy?
+    # May run into memory issues in future
+    preds = torch.zeros((len(g), x.shape[0]), dtype=torch.int)
+    for i, model in enumerate(tqdm(g)):
+        # predict function is flexible to type(x)
+        preds[i] = model.predict(x, return_numpy=False)
 
-    # Please someone check/improve this code
-    # It's psuedo-code right now
-    preds = [model(X_test).argmax(1) for model in g]
-    accs = [(pred==y_test).mean()*100 for pred in preds]
-    return accs.mean(), accs.std()
+    # return shape is (no. models, no.inputs)
+    # may want to flatten in case of single input
+    if return_numpy:
+        return preds.numpy()
+    return preds
 
-def p_flip_singleton(
-    g: list[nn.module],  # 200 models for FMNIST
-    X_test: torch.Tensor,  # multiple inputs
+def compute_accuracies(
+    preds: torch.Tensor | np.ndarray,
+    y: torch.Tensor | np.ndarray,
 ):
-    # Percentage of inputs with disagreement between at least one pair of models
-    # For each input in x_test, if ALL predictions ARE NOT the same, assign 1 to that input
-    # Return "mean of portion of test data with p_flip > 0"
+    # Convert to numpy if a tensor
+    preds = convert_to_numpy(preds)
+    y = convert_to_numpy(y)
+        
+    return (preds==y).mean(axis=1)*100
 
-    # Note that we're not computing the probability of flip between pairwise models
-    # For now, we're just computing if the probability is greater than 0
-    # i.e. at least one model has a different prediction to all the others
-    preds = torch.stack([model(X_test).argmax(1) for model in g])
+def compute_abstention_rate(
+    preds: torch.Tensor | np.ndarray,
+):
+    return np.mean(preds==np.inf, axis=1)*100
 
-    # e.g. size of preds is 200 x 10000
-    # for each input, check if any models predict different to the first model
-    p_flip_positive = torch.any(preds!=preds[0], dim=1).to(torch.float)
+def compute_disagreement(
+    preds: torch.Tensor | np.ndarray,
+):
+    """Proportion of inputs with disagreement between at least one pair of models
+    For each input in x_test, if ALL predictions ARE NOT the same, assign 1 to that input
+    Return "mean of portion of test data with p_flip > 0"
+    Note that we're not computing the probability of flip between pairwise models
+    For now, we're just computing if the probability is greater than 0
+    i.e. at least one model has a different prediction to all the others"""
+    # Special case for predictions from a single model
+    if len(preds.shape)==1:
+        return 0.0  # no disagreement
+    
+    # Convert to numpy if a tensor
+    preds = convert_to_numpy(preds)
 
-    # Please someone check/improve this code
-    # It seems to work if size of preds is no.models x no.inputs
-    # Maybe the preds line fails on certain types
-    # For FMNIST we need to do x_test.unsqueeze(1) I think
+    # For each input, check if any models predict different to the first model
+    p_flip_positive = np.any(preds!=preds[0], axis=0)  # size is no. inputs
     
     return p_flip_positive.mean()
 
+def compute_ensemble_predictions(
+    ensemble_size: int,
+    n_ensembles: int,
+    preds: torch.Tensor | np.ndarray,
+    ensemble_method: str = 'selective',
+):
+    # Convert to numpy if a tensor
+    preds = convert_to_numpy(preds)
+
+    # Compute no. inputs
+    n_inputs = preds.shape[1]
+
+    # Initialize predictions for each selective ensemble
+    ensemble_preds = np.zeros((n_ensembles, n_inputs))
+
+    # Compute predictions for each selective ensemble
+    for i in range(n_ensembles):
+        # Aggregate predictions for one ensemble
+        ensemble_model_preds = preds[ensemble_size*i:ensemble_size*(i+1)]
+
+        # Combine predictions
+        ensemble_preds[i] = select_preds(ensemble_model_preds, ensemble_method=ensemble_method)
+    
+    # Return predictions for each selective ensemble
+    return ensemble_preds
+
 def p_flip_ensemble(
-    ensembles: list[list[nn.module]],  # list of g, where g is list of singletons OR list of ensemble class
+    ensembles: list[list[nn.Module]],  # list of g, where g is list of singletons OR list of ensemble class
     X_test: torch.Tensor,  # multiple inputs
     a: float,
 ):
@@ -49,22 +92,16 @@ def p_flip_ensemble(
     # So we might need a model class for the selective ensemble
     # We also need a function for the standard ensemble
 
-    # Alternatively, modify util/predict_ensemble() to process a whole array of inputs instead of just 1
+    # Alternatively, modify util/select_preds() to process a whole array of inputs instead of just 1
     # As the inputs above suggest
-    # predict_ensemble should return array of size no. inputs, with nan value for abstention
+    # select_preds should return array of size no. inputs, with nan value for abstention
     # e.g. size of preds is 10 x 10000 for FMNIST (10 ensembles, 10000 test points)
-    preds = torch.stack([predict_ensemble(g, a, X_test) for g in ensembles])
+    preds = torch.stack([select_preds(g, a, X_test) for g in ensembles])
     p_flip_positive = torch.any(preds!=preds[0], dim=1).to(torch.float)
 
     # We'll assume that if all ensembles abstain for one particular input, all predictions are the same for that input
 
     return p_flip_positive.mean()
-
-def accuracy_ensemble():
-    # probably easier to just make an ensemble class so it can be passed as a "single model" to accuracy()
-    # restructure as you wish, we just need to evaluate selective ensembles and standard ensembles (average?)
-    # take in an ensemble and return the mean accuracy, std. dev, and abstention rate
-    return -1
 
 def SSIM(
     grads1: torch.Tensor,
