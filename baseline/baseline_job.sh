@@ -13,5 +13,5 @@ set -x
 module load python/3.9.12-fasrc01
 module load GCC/8.2.0-2.31.1
 
-python main.py --experiment loo --n 10 --loo
-python main.py --experiment rs --n 10 
+python main.py --experiment loo_200 --n 10 --loo
+python main.py --experiment rs_200 --n 10 
