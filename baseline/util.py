@@ -81,7 +81,7 @@ def select_preds(
             else:
                 # Compute binomial probability of n_a
                 # assuming equal chance between c_a and c_b
-                p = binom.pmf(n_a, n_a+n_b, 0.5)
+                p = 2*(1-binom.cdf(n_a, n_a+n_b, 0.5))
                 if p < a:
                     ensemble_preds[i] = c_a
                 else:
