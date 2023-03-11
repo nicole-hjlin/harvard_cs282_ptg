@@ -50,7 +50,8 @@ def plot_figure_3a(
     plt.figure(dpi=150, figsize=(5,4))
     colors = ['blue', 'lime', 'black', 'red']
     for i, random_source in enumerate(random_sources):
-        x_axis = [1]+ensemble_sizes
+        # Account for singletons
+        x_axis = [1] + ensemble_sizes
 
         # Traditional Ensembles
         y_axis = [disagreements_partial[i].mean()*100] + list(traditional_disagreements[i]*100)
@@ -108,9 +109,9 @@ def print_table_2(
         print(f'{random_source.upper()}\t\t\t1 (full)\t\t{disagreements_full[i]}')
         dis_partial = round(disagreements_partial[i].mean(), 4)
         print(f'{random_source.upper()}\t\t\t1 (partial)\t\t{dis_partial}')
-        for j, n in enumerate(ensemble_sizes):
+        for j, ensemble_size in enumerate(ensemble_sizes):
             dis = selective_disagreements[i,j]
-            print(f'{random_source.upper()}\t\t\t{n}\t\t\t{dis}')
+            print(f'{random_source.upper()}\t\t\t{ensemble_size}\t\t\t{dis}')
         print('-'*60)
     print("\nTable 2: Proportion of points with disagreement")
     print("between at least one pair of models (p_flip>0)")
@@ -136,11 +137,11 @@ def print_table_3(
     print(bold('\nRandomness\t\tn\t\t    FMNIST'))
     print('-'*60)
     for i, random_source in enumerate(random_sources):
-        for j, n in enumerate(ensemble_sizes):
+        for j, ensemble_size in enumerate(ensemble_sizes):
             acc = str(selective_accs[i,j].mean())[:4]
             abstain = str(abstention_rates[i,j].mean())[:4]
             traditional = str(traditional_accs[i,j].mean())[:4]
-            print(f'{random_source.upper()}\t\t\t{n}\t\t{acc}|{abstain}|{traditional}')
+            print(f'{random_source.upper()}\t\t\t{ensemble_size}\t\t{acc}|{abstain}|{traditional}')
         print('-'*60)
     print("\nTable 3: Accuracy and abstention rate of selective ensembles,")
     print("along with the accuracy of non-selective (traditional ensembles)")
