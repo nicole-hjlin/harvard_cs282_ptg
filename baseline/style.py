@@ -78,6 +78,7 @@ def print_preds_memory(
     bytes_per_input = preds.itemsize
     print(f'{int(n_inputs*bytes_per_input/10**3)}KB memory (single model predictions)')
     print(f'{int(n_models*n_inputs*bytes_per_input/10**6)}MB memory (all model predictions)')
+    print()
 
 def print_table_1(
     accs: list[np.ndarray],
