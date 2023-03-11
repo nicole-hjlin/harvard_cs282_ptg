@@ -1,10 +1,12 @@
-import argparse
-import torch
-import numpy as np
-import util, fmnist
-import wandb
-from metrics import compute_preds
+"""Main script for training models and saving predictions"""
 
+# Standard library imports
+import argparse
+import util
+import fmnist
+import wandb
+
+# Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('--experiment', type=str, default='glory', help='name of experiment')
 parser.add_argument('--n', type=int, default=200, help='size of ensemble')
@@ -17,6 +19,7 @@ parser.add_argument('--dropout', type=int, default=0.05, help='dropout rate')
 config = vars(parser.parse_args())
 wandb.config = config
 
+# Run experiment
 n = config['n']
 g = util.sample_ensemble(
     fmnist.learning_pipeline,
@@ -24,7 +27,8 @@ g = util.sample_ensemble(
     n,
 )
 
-# The following code can be uncommented when training/saving models locally
+# While the default is to use shell scripts to run on the cluster,
+# the following code can be uncommented when training/saving models locally
 # Note that the models will also still be saved on wandb
 # This code also currently saves test predictions in the checkpoints folder
 # 10,0000 predictions x 200 models x 4 bytes/input ~ 8MB
