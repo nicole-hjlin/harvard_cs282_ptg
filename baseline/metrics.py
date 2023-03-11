@@ -1,4 +1,5 @@
-"""Metrics for evaluating the performance of a model or ensemble of models"""
+"""Metrics for evaluating the performance of a model or ensemble of models
+In future, an ensemble class could be constructed to handle these methods"""
 
 import torch
 from torch import nn
@@ -18,8 +19,7 @@ def compute_preds(
     for i, model in enumerate(tqdm(g)):
         preds[i] = model.predict(x, return_numpy=False) # flexible to type(x)
 
-    # return shape is (no. models, no.inputs)
-    # may want to flatten in case of single input
+    # Return predictions of size (no. models, no.inputs)
     if return_numpy:
         return preds.numpy()
     return preds
@@ -34,6 +34,7 @@ def compute_accuracies(
     preds = convert_to_numpy(preds)
     y = convert_to_numpy(y)
 
+    # Return accuracy for each model
     return (preds==y).mean(axis=1)*100
 
 
@@ -42,6 +43,7 @@ def compute_abstention_rate(
 ):
     """Compute the percentage of inputs for which an ensemble abstains"""
 
+    # Return the percentage of inputs for which an ensemble abstains
     return np.mean(preds==np.inf, axis=1)*100
 
 
@@ -62,9 +64,10 @@ def compute_disagreement(
     preds = convert_to_numpy(preds)
 
     # For each input, check if any models predict different to the first model
-    p_flip_positive = np.any(preds!=preds[0], axis=0)  # size is no. inputs
+    disagreement_per_input = np.any(preds!=preds[0], axis=0)  # size is no. inputs
 
-    return p_flip_positive.mean()
+    # Return the proportion of inputs with disagreement
+    return disagreement_per_input.mean()
 
 
 def compute_ensemble_predictions(
@@ -95,20 +98,3 @@ def compute_ensemble_predictions(
 
     # Return predictions for each selective ensemble
     return ensemble_preds
-
-
-def p_flip_ensemble(
-    ensembles: list[list[nn.Module]],
-    X_test: torch.Tensor,
-    a: float,
-):
-    """Compute the probability of flip for each ensemble in set of ensembles
-    ensembles is a list of g, where g is a list of singletons OR list of ensemble class"""
-
-    # Compute predictions for each ensemble
-    preds = torch.stack([select_preds(g, a, X_test) for g in ensembles])
-    p_flip_positive = torch.any(preds!=preds[0], dim=1).to(torch.float)
-
-    # We'll assume that if all ensembles abstain for one particular input,
-    # all predictions are the same for that input
-    return p_flip_positive.mean()
