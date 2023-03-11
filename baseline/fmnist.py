@@ -1,11 +1,15 @@
-from util import State, convert_to_tensor
+"""FashionMNIST data, pipeline, and model
+In future dataset class can be implemented to cover all datasets"""
+
+
 import torch
 from torch import optim, nn
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
-from tqdm import tqdm
+from torchvision import datasets, transforms
 import wandb
-import numpy as np
+from tqdm import tqdm
+from util import State, convert_to_tensor
+
 
 dataset = datasets.FashionMNIST(
     'MNIST_data/',
@@ -14,6 +18,7 @@ dataset = datasets.FashionMNIST(
     transform=transforms.ToTensor(),
 )
 
+
 testset = datasets.FashionMNIST(
     'MNIST_data/',
     download=True,
@@ -21,7 +26,9 @@ testset = datasets.FashionMNIST(
     transform=transforms.ToTensor(),
 )
 
+
 def state_sampler() -> State:
+    """Sample a state for the learning pipeline"""
     if wandb.config['loo']:
         torch.seed()
         mask = torch.randperm(len(dataset))
@@ -30,15 +37,19 @@ def state_sampler() -> State:
     else:
         trainset = dataset
 
+    # Return a state object
     return State(
         LeNet5(num_classes=10, dropout=wandb.config['dropout']),
         trainset,
         wandb.config,
     )
 
+
 def learning_pipeline(S: State) -> nn.Module:
+    """Learning pipeline for FashionMNIST dataset"""
+
+    # Set up training
     S.net.train()
-    
     loss_fn = nn.CrossEntropyLoss()
     optimizer = optim.SGD(
         S.net.parameters(),
@@ -48,11 +59,10 @@ def learning_pipeline(S: State) -> nn.Module:
         S.trainset,
         batch_size=S.hyperparameters['batch_size'],
     )
-    
+
     wandb.watch(S.net, loss_fn, log='all', log_freq=1)
     epochs = S.hyperparameters['epochs']
-    print(epochs)
-    print(len(loader))
+
     with tqdm(total=epochs*len(loader), desc=wandb.run.name) as pbar:
         for _ in range(epochs):
             for i, (x, y) in enumerate(loader):
@@ -63,17 +73,23 @@ def learning_pipeline(S: State) -> nn.Module:
                 optimizer.step()
                 if i % 100 == 0:
                     acc = (y_pred.argmax(-1) == y).float().mean()
+                    # Log metrics to wandb
                     wandb.log({
                         'loss': loss,
                         'acc': acc,
                     })
                 pbar.update(1)
-    
 
+    # Return the trained model
     return S.net
 
+
 class LeNet5(nn.Module):
+    """LeNet5 model class for FashionMNIST dataset"""
+
     def __init__(self, num_classes: int, dropout: float):
+        """Initialize the model"""
+
         super().__init__()
         self.layer1 = nn.Sequential(
             nn.Conv2d(1, 6, kernel_size=5, stride=1, padding=2),
@@ -91,8 +107,11 @@ class LeNet5(nn.Module):
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         self.softmax = nn.Softmax(dim=-1)
-        
+
     def forward(self, x):
+        """Forward pass method, returns softmax predictions
+        x must be a tensor of shape (n, 1, 28, 28)"""
+
         z = self.layer1(x)
         z = self.layer2(z)
         z = z.flatten(start_dim=1)
@@ -102,14 +121,15 @@ class LeNet5(nn.Module):
         z = self.relu(self.fc2(z))
         z = self.dropout(z)
         z = self.softmax(self.fc3(z))
+
+        # Return softmax predictions
         return z
-    
+
     def predict(self, x, return_numpy=False):
-        # takes in tensor or numpy array
-        # shape is (n, 1, 28, 28) or (n, 28, 28) or (28, 28)
-        # returns hard predictions (tensor or numpy)
-        # returns the same type as the input
-        # return shape is (n, 1)
+        """Predict method, returns hard predictions
+        Flexible to take in tensor or numpy array
+        Shape of x is (n, 1, 28, 28) or (n, 28, 28) or (28, 28)
+        Returns numpy array if return_numpy is True"""
 
         # Convert input to tensor if it's a numpy array
         x = convert_to_tensor(x)
@@ -128,5 +148,4 @@ class LeNet5(nn.Module):
         # Return hard predictions
         if return_numpy:
             return preds.detach().numpy()
-        else:
-            return preds
+        return preds
