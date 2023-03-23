@@ -1,46 +1,49 @@
+"""FashionMNIST data, pipeline, and model. TODO: rewrite fmnist saving structure?"""
+
 import torch
 from torch import optim, nn
 from torch.utils.data import DataLoader, Subset
+from torchvision import datasets, transforms
 import wandb
 from tqdm import tqdm
 from util import State
-import pandas as pd
-from dataset import CSVDataset
 
+def load_fmnist_dataset() -> tuple[datasets.FashionMNIST, datasets.FashionMNIST]:
+    """
+    Load FashionMNIST dataset, return train and test sets
+    Downloads if not in default root directory of ./data/fmnist/
+    Transform is torchvision.transforms.ToTensor()
+    """
 
-def preprocessGermanSpecifically(df: pd.DataFrame) -> tuple[torch.Tensor, torch.Tensor]:
-    x = torch.from_numpy(df.values).float()
-    y = x[:,-1]
-    x = x[:,:-1]
-    
-    y = 2 - y
-    
-    return x, y
+    # Load trainset
+    trainset = datasets.FashionMNIST(
+        root='../data/fmnist/',
+        download=True,
+        train=True,
+        transform=transforms.ToTensor(),
+    )
 
-dataset = CSVDataset(
-    source_url="https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german/german.data-numeric",
-    download_path="../data/german/german.data-numeric",
-    sep=" +",
-    preprocess=preprocessGermanSpecifically,
-)
+    # Load testset
+    testset = datasets.FashionMNIST(
+        root='../data/fmnist/',
+        download=True,
+        train=False,
+        transform=transforms.ToTensor(),
+    )
 
-# dataset, testset = split(dataset)
-testset = CSVDataset(
-    source_url="https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german/german.data-numeric",
-    download_path="../data/german/german.data-numeric",
-    sep=" +",
-    preprocess=preprocessGermanSpecifically,
-)
+    # Return train/test sets
+    return trainset, testset
 
 def state_sampler() -> State:
-    """Sample a state for the learning pipeline"""
+    """Sample a state for the learning pipeline
+    We need to fix this. trainset should be included and training seed specified
+    """
+    trainset, _ = load_fmnist_dataset()
+
     if wandb.config['loo']:
-        torch.seed()
-        mask = torch.randperm(len(dataset))
-        trainset = Subset(dataset, mask[:int(0.9 * len(mask))])
+        mask = torch.randperm(len(trainset))
+        trainset = Subset(trainset, mask[:int(0.9 * len(mask))])
         torch.manual_seed(0)
-    else:
-        trainset = dataset
 
     # Return a state object
     return State(

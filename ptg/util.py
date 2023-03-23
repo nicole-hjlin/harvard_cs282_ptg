@@ -61,7 +61,8 @@ def sample_ensemble(
     n: int,
 ) -> list[nn.Module]:
     """Samples an ensemble of n models given a
-    learning pipeline P and a state sampler S"""
+    learning pipeline P and a state sampler S
+    Returns: list of trained models"""
 
     # Sample states
     S = [S() for _ in range(n)]

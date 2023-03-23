@@ -3,12 +3,14 @@
 # Standard library imports
 import argparse
 import util
-import fmnist, german
+import datasets
 import wandb
+from torch.utils.data import DataLoader
 
 # Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('--experiment', type=str, default='glory', help='name of experiment')
+parser.add_argument('--name', type=str, default='fmnist', help='Name of the dataset (fmnist, german, heloc, etc.)')
 parser.add_argument('--n', type=int, default=200, help='size of ensemble')
 parser.add_argument('--a', type=float, default=0.05, help='alpha')
 parser.add_argument('--lr', type=float, default=1e-1, help='learning rate')
@@ -17,11 +19,19 @@ parser.add_argument('--epochs', type=int, default=10, help='number of epochs')
 parser.add_argument('--batch_size', type=int, default=64, help='batch size')
 parser.add_argument('--dropout', type=int, default=0.05, help='dropout rate')
 
+
 config = vars(parser.parse_args())
 wandb.config = config
 
-print(len(german.dataset))
-print(german.dataset[0])
+trainset, testset = datasets.load_dataset(config['name'])
+train_dataloader = DataLoader(trainset, batch_size=config['batch_size'], shuffle=False)
+test_dataloader = DataLoader(testset, batch_size=config['batch_size'], shuffle=False)
+print(len(trainset))
+print(trainset[0])
+
+# print(len(fmnist.dataset))
+# print(len(fmnist.dataset[0]))
+# print(fmnist.dataset[0])
 
 # # Run experiment
 # n = config['n']
