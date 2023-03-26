@@ -1,0 +1,1 @@
+{"experiment": "glory", "name": "german", "n": 1000, "a": 0.05, "loo": false, "lr": 0.0004, "epochs": 100, "batch_size": 32, "dropout": 0, "optimizer": "adam", "wandb": false}
