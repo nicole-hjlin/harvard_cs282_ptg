@@ -1,8 +1,8 @@
-"""Main script for training models and saving predictions"""
+"""Main script for training models and saving weights/predictions"""
 
 # Standard library imports
 import argparse
-import util
+import train
 import datasets
 import wandb
 from torch.utils.data import DataLoader
@@ -11,35 +11,51 @@ from torch.utils.data import DataLoader
 parser = argparse.ArgumentParser()
 parser.add_argument('--experiment', type=str, default='glory', help='name of experiment')
 parser.add_argument('--name', type=str, default='fmnist', help='Name of the dataset (fmnist, german, heloc, etc.)')
-parser.add_argument('--n', type=int, default=200, help='size of ensemble')
+parser.add_argument('--n', type=int, default=20, help='number of models to train')
 parser.add_argument('--a', type=float, default=0.05, help='alpha')
-parser.add_argument('--lr', type=float, default=1e-1, help='learning rate')
 parser.add_argument('--loo', action='store_true', help='leave-one-out as source of randomness')
+parser.add_argument('--lr', type=float, default=1e-1, help='learning rate')
 parser.add_argument('--epochs', type=int, default=10, help='number of epochs')
 parser.add_argument('--batch_size', type=int, default=64, help='batch size')
-parser.add_argument('--dropout', type=int, default=0.05, help='dropout rate')
+parser.add_argument('--dropout', type=int, default=0, help='dropout rate')
+parser.add_argument('--optimizer', type=str, default='adam', help='optimizer (adam or sgd)')
+parser.add_argument('--wandb', action='store_true', help='use weights and biases monitoring')
 
 
 config = vars(parser.parse_args())
-wandb.config = config
+use_wandb = config['wandb']
+if use_wandb:
+    wandb.config = config
+print(config)
 
 trainset, testset = datasets.load_dataset(config['name'])
-train_dataloader = DataLoader(trainset, batch_size=config['batch_size'], shuffle=False)
-test_dataloader = DataLoader(testset, batch_size=config['batch_size'], shuffle=False)
-print(len(trainset))
-print(trainset[0])
+# train_dataloader = DataLoader(trainset, batch_size=config['batch_size'], shuffle=False)
+# test_dataloader = DataLoader(testset, batch_size=config['batch_size'], shuffle=False)
 
-# print(len(fmnist.dataset))
-# print(len(fmnist.dataset[0]))
-# print(fmnist.dataset[0])
+# print(len(trainset))
+# print(trainset[0][0].shape)
 
-# # Run experiment
-# n = config['n']
-# g = util.sample_ensemble(
-#     german.learning_pipeline,
-#     german.state_sampler,
-#     n,
-# )
+# Run experiment
+
+# Number of models to train
+n = config['n']
+
+# Get learning pipeline from dataset name
+learning_pipeline = train.get_learning_pipeline(config['name'])
+
+# Get model class from dataset name
+model_class = train.get_model_class(config['name'])
+
+# Get list of n states from model class, trainset and config
+# put everything in config and just pass that?
+states = train.get_states(n, model_class, trainset, testset, config)
+
+# Train models (one per state in states)
+train.train_models(
+    learning_pipeline,
+    states,
+    config,
+)
 
 # While the default is to use shell scripts to run on the cluster,
 # the following code can be uncommented when training/saving models locally

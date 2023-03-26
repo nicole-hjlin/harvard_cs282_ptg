@@ -1,6 +1,6 @@
 """Dataset module to load (and download) datasets. Reminder to put this in a package for AI4LIFE."""
 from .fmnist import load_fmnist_dataset
-from .tabular_dataset import load_tabular_dataset
+from .tabular import load_tabular_dataset
 
 def load_dataset(name):
     if name == 'fmnist':

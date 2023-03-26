@@ -2,11 +2,11 @@
 
 import torch
 from torch import optim, nn
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import wandb
 from tqdm import tqdm
-from util import State
+from util import State, convert_to_tensor
 
 def load_fmnist_dataset() -> tuple[datasets.FashionMNIST, datasets.FashionMNIST]:
     """
@@ -34,42 +34,32 @@ def load_fmnist_dataset() -> tuple[datasets.FashionMNIST, datasets.FashionMNIST]
     # Return train/test sets
     return trainset, testset
 
-def state_sampler() -> State:
-    """Sample a state for the learning pipeline
-    We need to fix this. trainset should be included and training seed specified
-    """
-    trainset, _ = load_fmnist_dataset()
-
-    if wandb.config['loo']:
-        mask = torch.randperm(len(trainset))
-        trainset = Subset(trainset, mask[:int(0.9 * len(mask))])
-        torch.manual_seed(0)
-
-    # Return a state object
-    return State(
-        LeNet5(num_classes=10, dropout=wandb.config['dropout']),
-        trainset,
-        wandb.config,
-    )
-
 
 def learning_pipeline(S: State) -> nn.Module:
     """Learning pipeline for FashionMNIST dataset"""
 
-    # Set up training
+    # Random seed (controls initialization and SGD stochasticity)
+    torch.manual_seed(S.seed)
+    
+    # Initialize model and set to train mode
+    S.net = S.net(num_classes=10, dropout=S.config['dropout'])
     S.net.train()
+
+    # Set up loss and optimizer
     loss_fn = nn.CrossEntropyLoss()
     optimizer = optim.SGD(
         S.net.parameters(),
-        lr=S.hyperparameters['lr'],
+        lr=S.config['lr'],
     )
+
+    # Set up dataloader
     loader = DataLoader(
         S.trainset,
-        batch_size=S.hyperparameters['batch_size'],
+        batch_size=S.config['batch_size'],
     )
 
     wandb.watch(S.net, loss_fn, log='all', log_freq=1)
-    epochs = S.hyperparameters['epochs']
+    epochs = S.config['epochs']
 
     with tqdm(total=epochs*len(loader), desc=wandb.run.name) as pbar:
         for _ in range(epochs):
@@ -139,6 +129,9 @@ class LeNet5(nn.Module):
         Shape of x is (n, 1, 28, 28) or (n, 28, 28) or (28, 28)
         Returns numpy array if return_numpy is True"""
 
+        # Convert input to tensor if it's a numpy array
+        x = convert_to_tensor(x)
+
         # Add extra dimension if input is size (28, 28)
         x = x.unsqueeze(0) if len(x.shape) == 2 else x  # size 2 -> 3
 
@@ -154,3 +147,22 @@ class LeNet5(nn.Module):
         if return_numpy:
             return preds.detach().numpy()
         return preds
+
+# def state_sampler() -> State:
+#     """Sample a state for the learning pipeline
+#     We need to fix this. trainset should be included and training seed specified
+#     """
+#     trainset, _ = load_fmnist_dataset()
+
+#     if wandb.config['loo']:
+#         torch.manual_seed(0)  # Set seed for reproducibility
+#         mask = torch.randperm(len(trainset))
+#         trainset = Subset(trainset, mask[:int(0.9 * len(mask))])
+#         torch.manual_seed(0)
+
+#     # Return a state object
+#     return State(
+#         LeNet5(num_classes=10, dropout=wandb.config['dropout']),
+#         trainset,
+#         wandb.config,
+#     )
