@@ -1,10 +1,12 @@
-import wandb
+"""Train model functions"""
+
+import json
+from os import makedirs, path
 import torch
 from torch import nn
-from torch.utils.data import Dataset, Subset
-from os import makedirs, path
+from torch.utils.data import Dataset
+import wandb
 from util import State, LearningPipeline
-import json
 import datasets
 from datasets.tabular import TabularSubset
 
@@ -27,7 +29,7 @@ def get_learning_pipeline(name: str) -> LearningPipeline:
     else:
         raise ValueError(f'Unknown dataset name: {name}')
     return learning_pipeline
-    
+
 def get_states(
     n: int,
     model: nn.Module,
