@@ -17,7 +17,7 @@ parser.add_argument('--loo', action='store_true', help='leave-one-out as source 
 parser.add_argument('--lr', type=float, default=1e-1, help='learning rate')
 parser.add_argument('--epochs', type=int, default=10, help='number of epochs')
 parser.add_argument('--batch_size', type=int, default=64, help='batch size')
-parser.add_argument('--dropout', type=int, default=0, help='dropout rate')
+parser.add_argument('--dropout', type=float, default=0, help='dropout rate')
 parser.add_argument('--optimizer', type=str, default='adam', help='optimizer (adam or sgd)')
 parser.add_argument('--wandb', action='store_true', help='use weights and biases monitoring')
 

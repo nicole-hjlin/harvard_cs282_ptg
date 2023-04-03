@@ -259,7 +259,7 @@ class TabularModel(nn.Module):
             return preds.detach().numpy()
         return preds
 
-    def compute_gradients(self, x, return_numpy=False):
+    def compute_gradients(self, x, softmax=False, label=1, return_numpy=False):
         """Compute gradients of the model with respect to the input
         Flexible to take in tensor or numpy array
         Shape of x is (no. inputs, no. features) or (no. features)
@@ -274,10 +274,14 @@ class TabularModel(nn.Module):
 
         # Compute gradients
         self.eval()
+        x = x.float()
         x.requires_grad = True
-        softmax = self(x.float())[:, 1]
-        grads = torch.autograd.grad(outputs=softmax, inputs=x,
-                                    grad_outputs=torch.ones_like(softmax))[0]
+        if softmax:
+            out = self(x)[:, label]
+        else:
+            out = self.network[:-1](x)[:, label]
+        grads = torch.autograd.grad(outputs=out, inputs=x,
+                                    grad_outputs=torch.ones_like(out))[0]
 
 
         # Convert to numpy array if return_numpy is True
