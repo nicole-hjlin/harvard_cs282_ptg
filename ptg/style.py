@@ -17,6 +17,43 @@ italic = lambda string: '\x1B[3m' + string + '\x1B[0m'
 
 ### Plot functions
 
+def get_top_k_for_plot(grad, k):
+    """Return top k gradients for plotting"""
+    max_idx = np.argsort(np.abs(grad))[-k:]
+    new_grads = np.zeros(len(grad))
+    new_grads[max_idx] = grad[max_idx]
+    return new_grads
+
+def plot_grads(grads, nrows, ncols, k=-1):
+    """grads has size (no. grads, no. features)"""
+    fig, axs = plt.subplots(nrows, ncols, dpi=100)
+    fig.set_figwidth(6*ncols)
+    fig.set_figheight(4*nrows)
+    n_features = len(grads[0])
+
+    for i in range(nrows):
+        for j in range(ncols):
+            # Select top k features (if applicable)
+            if k != -1:
+                grad = get_top_k_for_plot(grads[i*ncols+j], k)
+            else:
+                grad = grads[i*ncols+j]
+            # Account for singletons
+            if nrows==1:
+                ax = axs[j]
+            else:
+                ax = axs[i,j]
+            ax.bar(range(n_features), grad)
+
+def plot_single_grad(grad, k=-1):
+    """Plot gradients for a single model and test data point"""
+    n_features = len(grad)
+    plt.figure(dpi=100)
+    if k != -1:
+        grad = get_top_k_for_plot(grad, k)
+    plt.bar(range(n_features), grad)
+    plt.show()
+
 def plot_accuracies(
     accs: list[np.ndarray],
     random_sources: list[str],
