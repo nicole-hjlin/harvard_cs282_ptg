@@ -2,7 +2,7 @@
 including state samplers, learning pipelines, and ensembling methods"""
 
 import os
-from typing import Callable
+from typing import Callable, List, Union
 from dataclasses import dataclass
 import torch
 from torch import nn, optim
@@ -40,9 +40,9 @@ def get_optimizer(S: State):
 
 def train_ensemble(
     P: LearningPipeline,
-    S: list[State],
+    S: List[State],
     n: int,
-) -> list[nn.Module]:
+) -> List[nn.Module]:
     """Trains an ensemble of n models given a learning pipeline P and a list of states S"""
 
     # Initialize ensemble
@@ -98,7 +98,7 @@ def combine_preds(directory, random_source, idx):
 
 
 def convert_to_numpy(
-    arr: torch.Tensor | np.ndarray,
+    arr: Union[torch.Tensor, np.ndarray],
 ) -> np.ndarray:
     """Conditional conversion to a numpy array"""
 
@@ -107,7 +107,7 @@ def convert_to_numpy(
 
 
 def convert_to_tensor(
-    arr: torch.Tensor | np.ndarray,
+    arr: Union[torch.Tensor, np.ndarray],
 ) -> np.ndarray:
     """Conditional conversion to a torch tensor"""
 
@@ -116,7 +116,7 @@ def convert_to_tensor(
 
 
 def select_preds(
-    preds: torch.Tensor | np.ndarray,
+    preds: Union[torch.Tensor, np.ndarray],
     a: float = 0.05,
     ensemble_method: str = 'selective',
 ) -> np.ndarray:

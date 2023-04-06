@@ -9,6 +9,7 @@ import wandb
 from util import State, LearningPipeline
 import datasets
 from datasets.tabular import TabularSubset
+from typing import List
 
 def get_model_class(name: str) -> nn.Module:
     """Returns a model class by dataset name"""
@@ -36,7 +37,7 @@ def get_states(
     trainset: Dataset,
     testset: Dataset,
     config: dict,
-) -> list[State]:
+) -> List[State]:
     """Returns a list of states for the learning pipeline
 
     Warning: trainset needs to point to (a subset of) the original dataset,
@@ -78,9 +79,9 @@ def get_states(
 
 def train_models(
     P: LearningPipeline,
-    States: list[State],
+    States: List[State],
     config: dict,
-) -> list[nn.Module]:
+) -> List[nn.Module]:
     """Trains n models given a learning pipeline P and a list of states S"""
 
     # Initialize variables

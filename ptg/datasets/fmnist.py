@@ -7,8 +7,9 @@ from torchvision import datasets, transforms
 import wandb
 from tqdm import tqdm
 from util import State, convert_to_tensor
+from typing import Tuple
 
-def load_fmnist_dataset() -> tuple[datasets.FashionMNIST, datasets.FashionMNIST]:
+def load_fmnist_dataset() -> Tuple[datasets.FashionMNIST, datasets.FashionMNIST]:
     """
     Load FashionMNIST dataset, return train and test sets
     Downloads if not in default root directory of ./data/fmnist/

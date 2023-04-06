@@ -13,6 +13,7 @@ from torch.utils.data import Dataset, Subset
 from torchvision.transforms import ToTensor
 from util import State, convert_to_tensor, get_optimizer
 from .german import preprocess_german
+from typing import Tuple
 
 # Would be cleaner if these were included in their respective files actually
 download_urls = {'german': 'https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german/german.data',
@@ -188,7 +189,7 @@ def learning_pipeline(S: State) -> nn.Module:
     # Return the trained model
     return S.net
 
-def load_tabular_dataset(name: str) -> tuple[TabularDataset, TabularDataset]:
+def load_tabular_dataset(name: str) -> Tuple[TabularDataset, TabularDataset]:
     """Load tabular dataset, return train and test sets
     If neither train nor test file exists,
     download the dataset, preprocess it,
