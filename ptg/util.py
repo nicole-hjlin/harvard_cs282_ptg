@@ -186,3 +186,9 @@ def compute_top2(
 
     # Return top two classes and their frequencies
     return c_a, c_b, n_a, n_b
+
+def weight_distance(state_dict1, state_dict2):
+    dist = 0
+    for k, v in state_dict1.items():
+        dist += torch.norm(v - state_dict2[k], p=2)**2
+    return np.sqrt(dist)
