@@ -1,4 +1,7 @@
 import numpy as np
+import torch
+from tqdm import tqdm
+from train import get_model_class
 
 def get_top_k(k, X, return_sign=False):
     top_k = np.argsort(np.abs(X), axis=-1)[..., -k:][..., ::-1]
@@ -158,3 +161,95 @@ def top_k_consistency(top_k):
         consistency[input_idx] = total_consistency / num_pairs
 
     return consistency
+
+
+def top_k_experiment(ensemble_sizes, n_trials, test_idx, k, x,
+                     n_models, name, model_args, random_source):
+    # Initialize
+    directory = f'models/{name}'
+    model_class = get_model_class(name)
+    n_features = x.shape[1]
+
+    # Count variables
+    topk, signs, counts = [], [], []
+    counts_pos, counts_neg = [], []
+    topk_counts_signed, signs_counts_signed = [], []
+
+    # 'Average ensemble' variables (take mean of gradients across models)
+    topk_avg = np.zeros((len(ensemble_sizes), n_trials, len(test_idx), k))
+    signs_avg = np.zeros((len(ensemble_sizes), n_trials, len(test_idx), k), dtype=int)
+
+    # 'Norm-average ensemble' variables (normalize gradients to unit l2-norm for each model, then take mean)
+    topk_norm_avg = np.zeros((len(ensemble_sizes), n_trials, len(test_idx), k))
+    signs_norm_avg = np.zeros((len(ensemble_sizes), n_trials, len(test_idx), k), dtype=int)
+
+    # 'Average smooth ensemble' variables (for each model, add noise to weights and recompute gradients, take mean)
+    topk_smooth = np.zeros((len(ensemble_sizes), n_trials, len(test_idx), k))
+    signs_smooth = np.zeros((len(ensemble_sizes), n_trials, len(test_idx), k), dtype=int)
+    n_weight_perturbations = 20
+    sigma = 0.5
+    layer_str = 'network.0.weight'
+
+    for e, ensemble_size in tqdm(enumerate(ensemble_sizes)):
+        tk = np.zeros((n_trials, ensemble_size, len(test_idx), k))
+        s = np.zeros((n_trials, ensemble_size, len(test_idx), k), dtype=int)
+        co = np.zeros((n_trials, len(test_idx), n_features))
+        
+        # Initialize count arrays
+        co_pos = np.zeros((n_trials, len(test_idx), n_features))
+        co_neg = np.zeros((n_trials, len(test_idx), n_features))
+
+        for i in range(n_trials):
+            model_idx = np.random.choice(n_models, ensemble_size, replace=False)
+            grads = np.array([np.load(f'{directory}/{random_source}_grads_{idx}.npy') for idx in model_idx])
+            grads = grads[:, test_idx]
+            tk[i], s[i] = get_top_k(k=k, X=grads, return_sign=True)
+            topk_avg[e, i], signs_avg[e, i] = get_top_k(k=k, X=grads.mean(axis=0), return_sign=True)
+            norm_grads = grads/np.linalg.norm(grads+1e-20, axis=2, keepdims=True)
+            topk_norm_avg[e, i], signs_norm_avg[e, i] =\
+                get_top_k(k=k, X=norm_grads.mean(axis=0), return_sign=True)
+            
+            # Smooth ensemble
+            smooth_grads = np.zeros_like(grads)
+            for j in range(ensemble_size):
+                for _ in range(n_weight_perturbations):
+                    # Add noise to layer weights
+                    model = model_class(*model_args)
+                    state_dict = torch.load(f'{directory}/{random_source}_model_{model_idx[j]}.pth')
+                    state_dict[layer_str] += torch.randn(state_dict[layer_str].shape) * sigma
+                    model.load_state_dict(state_dict)
+
+                    # Compute new gradients
+                    smooth_grads[j] += model.compute_gradients(x, softmax=False, label=1, return_numpy=True)
+            smooth_grads /= n_weight_perturbations
+
+            topk_smooth[e, i], signs_smooth[e, i] =\
+                get_top_k(k=k, X=smooth_grads.mean(axis=0), return_sign=True)
+
+
+            # Compute counts
+            for t_i in range(len(test_idx)):
+                # Unique indices and their counts
+                u, c = np.unique(tk[i, :, t_i].flatten(), return_counts=True)
+                co[i, t_i, u.astype(int)] = c
+                for j in range(ensemble_size):
+                    for l in range(k):
+                        feature_idx = tk[i, j, t_i, l].astype(int)
+                        feature_sign = s[i, j, t_i, l]
+
+                        if feature_sign > 0:
+                            co_pos[i, t_i, feature_idx] += 1
+                        elif feature_sign < 0:
+                            co_neg[i, t_i, feature_idx] += 1
+        tk_co_s, s_co_s = get_top_k(k, co_pos-co_neg, return_sign=True)
+        
+        # Append to lists
+        topk.append(tk)
+        signs.append(s)
+        counts.append(co)
+        counts_pos.append(co_pos)
+        counts_neg.append(co_neg)
+        topk_counts_signed.append(tk_co_s)
+        signs_counts_signed.append(s_co_s)
+
+    return topk_counts_signed, signs_counts_signed, topk_avg, signs_avg, topk_norm_avg, signs_norm_avg, topk_smooth, signs_smooth
