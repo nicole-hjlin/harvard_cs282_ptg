@@ -21,6 +21,16 @@ def get_model_class(name: str) -> nn.Module:
         raise ValueError(f'Unknown dataset name: {name}')
     return model_class
 
+def get_curve_class(name: str) -> nn.Module:
+    """Returns a curve model class by dataset name"""
+    if name == 'fmnist':
+        curve_class = datasets.fmnist.LeNet5Curve
+    elif name in ['german', 'adult', 'heloc']:
+        curve_class = datasets.tabular.TabularModelCurve
+    else:
+        raise ValueError(f'Unknown dataset name: {name}')
+    return curve_class
+
 def get_learning_pipeline(name: str) -> LearningPipeline:
     """Returns a learning pipeline by dataset name"""
     if name == 'fmnist':

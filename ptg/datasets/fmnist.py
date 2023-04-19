@@ -8,6 +8,9 @@ import wandb
 from tqdm import tqdm
 from util import State, convert_to_tensor
 from typing import Tuple
+import math
+from ..modconn import curves
+
 
 def load_fmnist_dataset() -> Tuple[datasets.FashionMNIST, datasets.FashionMNIST]:
     """
@@ -148,6 +151,62 @@ class LeNet5(nn.Module):
         if return_numpy:
             return preds.detach().numpy()
         return preds
+    
+
+
+class LeNet5Curve(nn.Module):
+    """LeNet5 curve model class for FashionMNIST dataset"""
+
+    def __init__(self, num_classes: int, dropout: float, fix_points: bool):
+        super(LeNet5Curve, self).__init__()
+        self.conv1 = curves.Conv2d(1, 6, kernel_size=5, stride=1, padding=2, fix_points=fix_points)
+        self.batch1 = curves.BatchNorm2d(6, fix_points=fix_points)
+        self.max_pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.conv2 = curves.Conv2d(6, 16, kernel_size=5, stride=1, padding=0, fix_points=fix_points)
+        self.batch2 = curves.BatchNorm2d(16, fix_points=fix_points)
+        self.max_pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.fc1 = curves.Linear(400, 120, fix_points=fix_points)
+        self.fc2 = curves.Linear(120, 84, fix_points=fix_points)
+        self.fc3 = curves.Linear(84, num_classes, fix_points=fix_points)
+        self.relu = nn.ReLU(True)
+        self.dropout = nn.Dropout(dropout)
+        self.softmax = nn.Softmax(dim=-1)
+
+        # Initialize weights
+        for m in self.modules():
+            if isinstance(m, curves.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                for i in range(m.num_bends):
+                    getattr(m, 'weight_%d' % i).data.normal_(0, math.sqrt(2. / n))
+                    getattr(m, 'bias_%d' % i).data.zero_()
+
+    def forward(self, x, coeffs_t):
+        """Forward pass method, returns softmax predictions
+        x must be a tensor of shape (n, 1, 28, 28)"""
+
+        z = self.conv1(x, coeffs_t)
+        z = self.batch1(z, coeffs_t)
+        z = self.relu(z)
+        z = self.max_pool1(z)
+
+        z = self.conv2(z, coeffs_t)
+        z = self.batch2(z, coeffs_t)
+        z = self.relu(z)
+        z = self.max_pool2(z)
+
+        z = z.flatten(start_dim=1)
+        z = self.dropout(z)
+        z = self.relu(self.fc1(z, coeffs_t))
+        z = self.dropout(z)
+        z = self.relu(self.fc2(z, coeffs_t))
+        z = self.dropout(z)
+        z = self.softmax(self.fc3(z, coeffs_t))
+
+        # Return softmax predictions
+        return z
+
 
 # def state_sampler() -> State:
 #     """Sample a state for the learning pipeline

@@ -253,8 +253,7 @@ class BatchNorm2d(_BatchNorm):
 
 
 class CurveNet(Module):
-    def __init__(self, num_classes, curve, architecture, num_bends, fix_start=True, fix_end=True,
-                 architecture_kwargs={}):
+    def __init__(self, num_classes, curve, architecture, num_bends, model_arts, fix_start=True, fix_end=True):
         super(CurveNet, self).__init__()
         self.num_classes = num_classes
         self.num_bends = num_bends
@@ -265,7 +264,7 @@ class CurveNet(Module):
 
         self.l2 = 0.0
         self.coeff_layer = self.curve(self.num_bends)
-        self.net = self.architecture(num_classes, fix_points=self.fix_points, **architecture_kwargs)
+        self.net = self.architecture(num_classes, fix_points=self.fix_points, *model_arts)
         self.curve_modules = []
         for module in self.net.modules():
             if issubclass(module.__class__, CurveModule):
