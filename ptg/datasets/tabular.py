@@ -14,7 +14,7 @@ from torchvision.transforms import ToTensor
 from util import State, convert_to_tensor, get_optimizer
 from .german import preprocess_german
 from typing import Tuple
-from modconn import curves
+from datasets import curves
 
 
 # Would be cleaner if these were included in their respective files actually
