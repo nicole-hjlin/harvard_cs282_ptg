@@ -14,6 +14,8 @@ from torchvision.transforms import ToTensor
 from util import State, convert_to_tensor, get_optimizer
 from .german import preprocess_german
 from typing import Tuple
+from modconn import curves
+
 
 # Would be cleaner if these were included in their respective files actually
 download_urls = {'german': 'https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german/german.data',
@@ -290,3 +292,28 @@ class TabularModel(nn.Module):
             grads = grads.detach().numpy()
 
         return grads
+
+class TabularModelCurve(nn.Module):
+    """Tabular curve model for binary classification"""
+    def __init__(self, input_size, hidden_layers, fix_points: list[bool]):
+        super(TabularModelCurve, self).__init__()
+        self.input_size = input_size
+        self.hidden_layers = hidden_layers
+
+        model_layers = []
+        previous_layer_size = input_size
+        for layer_size in hidden_layers:
+            model_layers.append(curves.Linear(previous_layer_size, layer_size, fix_points=fix_points))
+            model_layers.append(nn.ReLU())
+            previous_layer_size = layer_size
+        model_layers.append(curves.Linear(previous_layer_size, 2, fix_points=fix_points))
+        model_layers.append(nn.Softmax(dim=-1))
+        self.network = nn.Sequential(*model_layers)
+
+    def forward(self, x, coeffs_t):
+        for layer in self.network:
+            if isinstance(layer, curves.Linear):
+                x = layer(x, coeffs_t)
+            else:
+                x = layer(x)
+        return x
