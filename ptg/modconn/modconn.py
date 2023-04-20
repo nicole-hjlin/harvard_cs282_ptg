@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from modconn import curves
+from datasets import curves
 from modconn import utils
 
 from torch import nn

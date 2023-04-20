@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn.functional as F
 
-from modconn import curves
+from datasets import curves
 
 
 def l2_regularizer(weight_decay):
