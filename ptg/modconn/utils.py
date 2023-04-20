@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn.functional as F
 
-import curves
+from modconn import curves
 
 
 def l2_regularizer(weight_decay):
@@ -50,8 +50,8 @@ def train(train_loader, model, optimizer, criterion, regularizer=None, lr_schedu
         if lr_schedule is not None:
             lr = lr_schedule(iter / num_iters)
             adjust_learning_rate(optimizer, lr)
-        input = input.cuda()
-        target = target.cuda()
+        input = input
+        target = target
 
         output = model(input)
         loss = criterion(output, target)

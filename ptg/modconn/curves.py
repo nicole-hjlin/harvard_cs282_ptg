@@ -264,7 +264,10 @@ class CurveNet(Module):
 
         self.l2 = 0.0
         self.coeff_layer = self.curve(self.num_bends)
-        self.net = self.architecture(num_classes, fix_points=self.fix_points, *model_arts)
+        print(self.fix_points)
+        self.net = self.architecture(input_size=23,
+                                     hidden_layers=[128,64,16],
+                                     fix_points=self.fix_points)#, *model_arts)
         self.curve_modules = []
         for module in self.net.modules():
             if issubclass(module.__class__, CurveModule):
@@ -311,6 +314,14 @@ class CurveNet(Module):
         output = self.net(input, coeffs_t)
         self._compute_l2()
         return output
+    
+    def get_weights(self, t):
+        coeffs_t = self.coeff_layer(t)
+        weights = []
+        for module in self.curve_modules:
+            weights.extend([w for w in module.compute_weights_t(coeffs_t) if w is not None])
+        return weights
+        
 
 
 def l2_regularizer(weight_decay):

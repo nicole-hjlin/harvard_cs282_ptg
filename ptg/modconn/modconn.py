@@ -1,11 +1,12 @@
 import torch
 import torch.nn.functional as F
 
-import curves
-import utils
+from modconn import curves
+from modconn import utils
 
 from torch import nn
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
 def learning_rate_schedule(base_lr, epoch, total_epochs):
@@ -37,8 +38,8 @@ def train_curve(
 ):
     model = curves.CurveNet(
         num_classes,
-        curve,
-        curve_class,
+        curve,  #polychain
+        curve_class,  #architecture
         num_bends,
         model_args,
         fix_start,
@@ -48,12 +49,12 @@ def train_curve(
     for path, k in [(init_start, 0), (init_end, num_bends - 1)]:
         if path is not None:
             if base_model is None:
-                base_model = model_class(num_classes=num_classes, *model_args)
+                base_model = model_class(input_size=23,
+                                         hidden_layers=[128,64,16])
             state_dict = torch.load(path)
             base_model.load_state_dict(state_dict)
             model.import_base_parameters(base_model, k)
     model.init_linear()
-    model.cuda()
 
     criterion = F.cross_entropy
     optimizer = torch.optim.SGD(
@@ -62,7 +63,7 @@ def train_curve(
         momentum=momentum,
     )
 
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs)):
         lr = learning_rate_schedule(lr, epoch, epochs)
         utils.adjust_learning_rate(optimizer, lr)
 
