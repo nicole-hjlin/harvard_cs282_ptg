@@ -63,7 +63,7 @@ def train_curve(
         momentum=momentum,
     )
 
-    for epoch in tqdm(range(epochs)):
+    for epoch in range(epochs):
         lr = learning_rate_schedule(lr, epoch, epochs)
         utils.adjust_learning_rate(optimizer, lr)
 
