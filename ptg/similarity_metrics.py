@@ -11,6 +11,25 @@ def get_top_k(k, X, return_sign=False):
         return top_k, sign_vector.astype(int)
     else:
         return top_k
+    
+def average_ground_truth_score(X, signs_X, gt, signs_gt, metric_func):
+    """
+    Compute the average similarity score between the ground truth
+    and the ensemble, across all trials (each trial is one ensemble size).
+    Input size is (n_trials, n_inputs, k)
+    Ground truth, gt, is size (n_inputs, k)
+    Returns a vector of size (n_inputs,)
+    where each entry is the average similarity score
+    """
+    n_trials, n_inputs, k = X.shape
+    scores = np.zeros(n_inputs)
+
+    for i in range(n_trials):
+        scores += metric_func(X[i], gt, signs_X[i], signs_gt)
+
+    scores /= n_trials
+
+    return scores
 
 def average_pairwise_score(X, signs_X, metric_func):
     """Compute the average pairwise score across trials.

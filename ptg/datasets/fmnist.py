@@ -9,7 +9,7 @@ from tqdm import tqdm
 from util import State, convert_to_tensor
 from typing import Tuple
 import math
-from datasets import curves
+from modconn import curves
 
 
 def load_fmnist_dataset() -> Tuple[datasets.FashionMNIST, datasets.FashionMNIST]:

@@ -6,6 +6,7 @@ import wandb
 from torch.utils.data import DataLoader
 import torch
 from torch import nn
+import numpy as np
 from tqdm import tqdm
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -262,7 +263,8 @@ class TabularModel(nn.Module):
             return preds.detach().numpy()
         return preds
 
-    def compute_gradients(self, x, softmax=False, label=1, return_numpy=False):
+    def compute_gradients(self, x, softmax=False, label=1,
+                          return_numpy=False):
         """Compute gradients of the model with respect to the input
         Flexible to take in tensor or numpy array
         Shape of x is (no. inputs, no. features) or (no. features)
@@ -283,6 +285,7 @@ class TabularModel(nn.Module):
             out = self(x)[:, label]
         else:
             out = self.network[:-1](x)[:, label]
+
         grads = torch.autograd.grad(outputs=out, inputs=x,
                                     grad_outputs=torch.ones_like(out))[0]
 
@@ -292,6 +295,44 @@ class TabularModel(nn.Module):
             grads = grads.detach().numpy()
 
         return grads
+    
+    def compute_perturbed_gradients(self, x, sigma=0.5, n=100):
+        perturbed_model = TabularModelPerturb(self, n, sigma)
+        return perturbed_model.compute_gradients(x)
+
+class TabularModelPerturb(nn.Module):
+    def __init__(self, base_model, num_perturbations, sigma):
+        super().__init__()
+        self.num_perturbations = num_perturbations
+
+        self.models = nn.ModuleList()
+        for i in range(num_perturbations):
+            model = TabularModel(base_model.input_size, base_model.hidden_layers)
+            model.load_state_dict(base_model.state_dict())
+            with torch.no_grad():
+                layer_weights = model.state_dict()['network.0.weight']
+                #torch.manual_seed(i)  # reproducibility
+                noise = torch.randn_like(layer_weights) * sigma
+                layer_weights.add_(noise)
+            self.models.append(model)
+
+    def forward(self, x):
+        outputs = [model(x) for model in self.models]
+        return torch.stack(outputs, dim=0)
+    
+    def predict(self, x, mean=True):
+        logits = self(torch.FloatTensor(x))
+        if mean:
+            preds = logits.mean(axis=0).argmax(1)
+        else:
+            preds = logits.argmax(2)
+        return preds.detach().numpy()
+    
+    def compute_gradients(self, x, mean=True):
+        grads = [model.compute_gradients(x, return_numpy=True) for model in self.models]
+        if mean:
+            return np.array(grads).mean(axis=0)
+        return np.array(grads)
 
 class TabularModelCurve(nn.Module):
     """Tabular curve model for binary classification"""

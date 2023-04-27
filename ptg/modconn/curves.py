@@ -253,21 +253,21 @@ class BatchNorm2d(_BatchNorm):
 
 
 class CurveNet(Module):
-    def __init__(self, num_classes, curve, architecture, num_bends, model_arts, fix_start=True, fix_end=True):
+    def __init__(self, num_classes, curve, architecture, num_bends,
+                 model_arts, fix_start=True, fix_end=True):
         super(CurveNet, self).__init__()
         self.num_classes = num_classes
         self.num_bends = num_bends
         self.fix_points = [fix_start] + [False] * (self.num_bends - 2) + [fix_end]
         
-        self.curve = curve
-        self.architecture = architecture
+        self.curve = curve  # PolyChain
+        self.architecture = architecture  #TabularModelCurve
 
         self.l2 = 0.0
         self.coeff_layer = self.curve(self.num_bends)
-        print(self.fix_points)
         self.net = self.architecture(input_size=23,
                                      hidden_layers=[128,64,16],
-                                     fix_points=self.fix_points)#, *model_arts)
+                                     fix_points=self.fix_points)
         self.curve_modules = []
         for module in self.net.modules():
             if issubclass(module.__class__, CurveModule):
@@ -290,6 +290,12 @@ class CurveNet(Module):
             base_parameter.data.copy_(parameter.data)
 
     def init_linear(self):
+        """
+        Initialize each layer on each bend to be a linear combination of
+        that layer on the first bend and that layer on the last bend.
+        In other words, each bend's parameters are initialized to the
+        line segment between the first and last bend's parameters.
+        """
         parameters = list(self.net.parameters())
         for i in range(0, len(parameters), self.num_bends):
             weights = parameters[i:i+self.num_bends]
@@ -297,30 +303,49 @@ class CurveNet(Module):
                 alpha = j * 1.0 / (self.num_bends - 1)
                 weights[j].data.copy_(alpha * weights[-1].data + (1.0 - alpha) * weights[0].data)
 
-    def weights(self, t):
+    def init_radial(self):
+        """
+        Assumes the end points have roughly the same l2 norm in weight space.
+        Initialize each layer on each bend to be a linear combination of
+        that layer on the first bend and that layer on the last bend.
+        
+        Then scale each layer on each bend such that the l2 norm of the
+        parameters on that bend is the same as that of the first bend
+        
+        Again, assuming the end points have roughly the same l2 norm in weight space).
+        """
+        self.init_linear()
+        parameters = list(self.net.parameters())
+        bend_norms = [np.linalg.norm(self.weights(t))\
+                              for t in np.linspace(0, 1, self.num_bends)]
+        norm_diff = bend_norms[-1] - bend_norms[0]
+        for i in range(0, len(parameters), self.num_bends):
+            weights = parameters[i:i+self.num_bends]
+            for j in range(1, self.num_bends - 1):
+                scaler = bend_norms[0] + norm_diff * j / (self.num_bends - 1)
+                weights[j].data.mul_(scaler / bend_norms[j])
+
+    def weights(self, t, concatenate=True):
         coeffs_t = self.coeff_layer(t)
         weights = []
         for module in self.curve_modules:
             weights.extend([w for w in module.compute_weights_t(coeffs_t) if w is not None])
-        return np.concatenate([w.detach().cpu().numpy().ravel() for w in weights])
+        if concatenate:
+            return np.concatenate([w.detach().cpu().numpy().ravel() for w in weights])
+        return weights
 
     def _compute_l2(self):
         self.l2 = sum(module.l2 for module in self.curve_modules)
 
     def forward(self, input, t=None):
         if t is None:
+            # t = np.random.normal(0, 1)
+            # t = (t+3)/6
             t = input.data.new(1).uniform_()
         coeffs_t = self.coeff_layer(t)
         output = self.net(input, coeffs_t)
         self._compute_l2()
         return output
-    
-    def get_weights(self, t):
-        coeffs_t = self.coeff_layer(t)
-        weights = []
-        for module in self.curve_modules:
-            weights.extend([w for w in module.compute_weights_t(coeffs_t) if w is not None])
-        return weights
         
 
 
