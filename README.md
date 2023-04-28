@@ -23,3 +23,11 @@ python3 train.py --name <DATASET NAME> \ # default = heloc
                  --wandb \ # use to track training with weights and biases
                  --experiment <EXPERIMENT> \ # name of experiment for wandb
 ```
+
+### Post-Processing Models
+
+To compute standard/perturbed logits, predictions, gradients, use the following command
+
+```
+python3 postprocess.py --IMPLEMENT
+```
