@@ -1,6 +1,7 @@
-"""Train model functions"""
+"""Train model script and helper functions"""
 
 import json
+import argparse
 from os import makedirs, path
 import torch
 from torch import nn
@@ -97,12 +98,17 @@ def train_models(
     # Initialize variables
     r = 'loo' if config['loo'] else 'rs'
     name = config['name']
-    directory = f'models/{name}'
+    optim = config['optimizer']
+    epochs = config['epochs']
+    lr = config['lr']
+    batch_size = config['batch_size']
+    dropout = config['dropout']
+    directory = f'models/{name}/{r}/{optim}_epochs{epochs}_lr{lr}_batch{batch_size}_dropout{dropout}'
 
     # Save config dictionary
     if not path.exists(directory):
         makedirs(directory)
-    with open(f'{directory}/{r}_config.json', 'w') as f:
+    with open(f'{directory}/config.json', 'w') as f:
         json.dump(config, f)
 
     # Train each model
@@ -110,7 +116,7 @@ def train_models(
         # Start wandb run
         if config['wandb']:
             wandb.init(
-                project='ptg-baseline',
+                project='baseline',
                 group=config['experiment'],
                 name=f'model{i}',
                 config=config,
@@ -120,8 +126,53 @@ def train_models(
         model = P(S)
 
         # Save model
-        torch.save(model.state_dict(), f'{directory}/{r}_model_{i}.pth')
+        torch.save(model.state_dict(), f'{directory}/model_{i}.pth')
 
         # Finish wandb run
         if config['wandb']:
             wandb.finish()
+
+
+if __name__ == '__main__':
+    # Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--name', type=str, default='fmnist', help='Name of the dataset (fmnist, german, heloc, etc.)')
+    parser.add_argument('--n', type=int, default=20, help='number of models to train')
+    parser.add_argument('--loo', action='store_true', help='leave-one-out as source of randomness')
+    parser.add_argument('--lr', type=float, default=1e-1, help='learning rate')
+    parser.add_argument('--epochs', type=int, default=20, help='number of epochs')
+    parser.add_argument('--batch_size', type=int, default=64, help='batch size')
+    parser.add_argument('--dropout', type=float, default=0, help='dropout rate')
+    parser.add_argument('--optimizer', type=str, default='sgd', help='optimizer (adam or sgd)')
+    parser.add_argument('--wandb', action='store_true', help='use weights and biases monitoring')
+    parser.add_argument('--experiment', type=str, default='training', help='name of experiment for wandb')
+
+    # Get config dictionary
+    config = vars(parser.parse_args())
+    use_wandb = config['wandb']
+    if use_wandb:
+        wandb.config = config
+    print(config)
+
+    # Load dataset
+    trainset, testset = datasets.load_dataset(config['name'])
+
+    # Number of models to train
+    n = config['n']
+
+    # Get learning pipeline from dataset name
+    learning_pipeline = get_learning_pipeline(config['name'])
+
+    # Get model class from dataset name
+    model_class = get_model_class(config['name'])
+
+    # Get list of n states from model class, trainset and config
+    # put everything in config and just pass that?
+    states = get_states(n, model_class, trainset, testset, config)
+
+    # Train models (one per state in states)
+    train_models(
+        learning_pipeline,
+        states,
+        config,
+    )
