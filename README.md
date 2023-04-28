@@ -26,8 +26,17 @@ python3 train.py --name <DATASET NAME> \ # default = heloc
 
 ### Post-Processing Models
 
-To compute standard/perturbed logits, predictions, gradients, use the following command
+To compute standard/perturbed logits, predictions, explanations, first configure the postprocess_config.json file
+
+This will specify the directory folder via name/hyperparameters, and perturbation/explanation parameters
+
+Then run the following command:
 
 ```
-python3 postprocess.py --IMPLEMENT
+python3 postprocess.py --loo \ # use for leave-one-out as source of randomness
+                       --preds \ # use to save predictions from models
+                       --logits \ # use to save logits from models
+                       --explanation <EXPLANATION> \ # default = '', use to save explanations by name e.g. gradients, smoothgrad, etc.
+                       --perturb \ # use to perturb weights before saving statistics
+                       --config <CONFIG> \ # default = postprocess_config.json, use to select directory/parameters
 ```
