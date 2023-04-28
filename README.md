@@ -1,7 +1,7 @@
 # Harvard COMPSCI 282BR
 ## Topics in Machine Learning: Interpretability and Explainability
 
-Dan Ley, Hongjin Lin, Leonard Tang, Matthew Nazari
+Dan Ley, Matthew Nazari, Leonard Tang, Hongjin Lin
 
 2023 Spring
 
