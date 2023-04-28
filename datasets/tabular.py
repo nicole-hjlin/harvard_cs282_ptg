@@ -47,7 +47,7 @@ class TabularDataset(Dataset):
         self.preprocess_func = preprocess_func
         self.sep = sep
         self.transform = transform
-        self.data_dir = f'../data/{name}'
+        self.data_dir = f'datasets/data/{name}'
         self.train_file = f'{self.data_dir}/{name}_train.csv'
         self.test_file = f'{self.data_dir}/{name}_test.csv'
 
