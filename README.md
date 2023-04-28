@@ -30,7 +30,7 @@ To compute standard/perturbed logits, predictions, explanations, first configure
 
 This will specify the directory folder via name/hyperparameters, and perturbation/explanation parameters
 
-Then run the following command:
+Statistics can be computed using the following command
 
 ```
 python3 postprocess.py --loo \ # use for leave-one-out as source of randomness
