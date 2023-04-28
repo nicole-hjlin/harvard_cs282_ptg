@@ -100,37 +100,6 @@ def learning_pipeline(S: State) -> nn.Module:
     # Return the trained model
     return S.net
 
-def load_tabular_dataset(name: str) -> Tuple[TabularDataset, TabularDataset]:
-    """Load tabular dataset, return train and test sets
-    If neither train nor test file exists,
-    download the dataset, preprocess it,
-    and split it into train and test sets,
-    overwriting any existing files
-    If both train and test files exist,
-    load them from the '../data/name/' directory
-
-    Called once in main.py
-    """
-
-    # Load trainset
-    trainset = TabularDataset(
-        name=name,
-        download_url=download_urls[name],
-        train=True,
-        preprocess_func=preprocess_funcs[name],
-    )
-
-    # Load testset
-    testset = TabularDataset(
-        name=name,
-        download_url=download_urls[name],
-        train=False,
-        preprocess_func=preprocess_funcs[name],
-    )
-
-    # Return train/test sets
-    return trainset, testset
-
 class TabularSubset(Subset):
     def __init__(self, dataset, indices):
         super().__init__(dataset, indices)
@@ -223,6 +192,37 @@ class TabularDataset(Dataset):
         sample = self.data[idx]
         label = self.labels[idx]
         return sample, label
+
+def load_tabular_dataset(name: str) -> Tuple[TabularDataset, TabularDataset]:
+    """Load tabular dataset, return train and test sets
+    If neither train nor test file exists,
+    download the dataset, preprocess it,
+    and split it into train and test sets,
+    overwriting any existing files
+    If both train and test files exist,
+    load them from the '../data/name/' directory
+
+    Called once in main.py
+    """
+
+    # Load trainset
+    trainset = TabularDataset(
+        name=name,
+        download_url=download_urls[name],
+        train=True,
+        preprocess_func=preprocess_funcs[name],
+    )
+
+    # Load testset
+    testset = TabularDataset(
+        name=name,
+        download_url=download_urls[name],
+        train=False,
+        preprocess_func=preprocess_funcs[name],
+    )
+
+    # Return train/test sets
+    return trainset, testset
 
 class TabularModel(nn.Module):
     """Tabular model for binary classification"""
