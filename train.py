@@ -136,7 +136,7 @@ def train_models(
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name', type=str, default='fmnist',
+    parser.add_argument('--name', type=str, default='heloc',
                         help='Name of the dataset (fmnist, german, heloc, etc.)')
     parser.add_argument('--n', type=int, default=20, help='number of models to train')
     parser.add_argument('--loo', action='store_true', help='leave-one-out as source of randomness')

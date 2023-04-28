@@ -207,7 +207,7 @@ def print_table_3(
     print("randomly selected models.")
 
 def print_preds_memory(
-    preds: np.ndarray | torch.Tensor,
+    preds,
 ):
     """Print memory usage of prediction arrays"""
 

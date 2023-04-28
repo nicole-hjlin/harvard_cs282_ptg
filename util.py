@@ -72,22 +72,6 @@ def train_ensemble(
     # Return the ensemble
     return g
 
-
-# def sample_ensemble(
-#     P: LearningPipeline,
-#     S: StateSampler,
-#     n: int,
-# ) -> list[nn.Module]:
-#     """Samples an ensemble of n models given a
-#     learning pipeline P and a state sampler S
-#     Returns: list of trained models"""
-
-#     # Sample states
-#     S = [S() for _ in range(n)]
-
-#     # Return list of trained models
-#     return train_ensemble(P, S, n)
-
 def combine_preds(directory, random_source, idx):
     """Get predictions from a directory, given a random source and indices
     Returns the predictions in a numpy array"""
