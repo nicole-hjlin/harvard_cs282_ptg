@@ -43,7 +43,7 @@ def get_learning_pipeline(name: str) -> LearningPipeline:
     return learning_pipeline
 
 def get_states(
-    n: int,
+    n_states: int,
     model: nn.Module,
     trainset: Dataset,
     testset: Dataset,
@@ -63,7 +63,7 @@ def get_states(
     we construct the states, because we want to set the seed for each model.
     """
     States = []
-    for i in range(n):
+    for i in range(n_states):
         # Permute trainset if loo
         if config['loo']:
             # Permute trainset with seed
@@ -136,7 +136,8 @@ def train_models(
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name', type=str, default='fmnist', help='Name of the dataset (fmnist, german, heloc, etc.)')
+    parser.add_argument('--name', type=str, default='fmnist',
+                        help='Name of the dataset (fmnist, german, heloc, etc.)')
     parser.add_argument('--n', type=int, default=20, help='number of models to train')
     parser.add_argument('--loo', action='store_true', help='leave-one-out as source of randomness')
     parser.add_argument('--lr', type=float, default=1e-1, help='learning rate')
