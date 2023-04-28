@@ -1,1 +1,0 @@
-{"experiment": "glory", "name": "heloc", "n": 100, "loo": false, "lr": 0.004, "epochs": 30, "batch_size": 32, "dropout": 0.0, "optimizer": "adam", "wandb": false}
