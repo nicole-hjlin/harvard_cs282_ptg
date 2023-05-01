@@ -6,11 +6,10 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import wandb
 from tqdm import tqdm
-from util import State, convert_to_tensor
 from typing import Tuple
 import math
+import numpy as np
 from modconn import curves
-
 
 def load_fmnist_dataset() -> Tuple[datasets.FashionMNIST, datasets.FashionMNIST]:
     """
@@ -39,7 +38,7 @@ def load_fmnist_dataset() -> Tuple[datasets.FashionMNIST, datasets.FashionMNIST]
     return trainset, testset
 
 
-def learning_pipeline(S: State) -> nn.Module:
+def learning_pipeline(S):
     """Learning pipeline for FashionMNIST dataset"""
 
     # Random seed (controls initialization and SGD stochasticity)
@@ -207,22 +206,14 @@ class LeNet5Curve(nn.Module):
         # Return softmax predictions
         return z
 
+def convert_to_tensor(arr):
+    """Conditional conversion to a torch tensor"""
 
-# def state_sampler() -> State:
-#     """Sample a state for the learning pipeline
-#     We need to fix this. trainset should be included and training seed specified
-#     """
-#     trainset, _ = load_fmnist_dataset()
+    # Return torch tensor
+    return torch.from_numpy(arr) if isinstance(arr, np.ndarray) else arr
 
-#     if wandb.config['loo']:
-#         torch.manual_seed(0)  # Set seed for reproducibility
-#         mask = torch.randperm(len(trainset))
-#         trainset = Subset(trainset, mask[:int(0.9 * len(mask))])
-#         torch.manual_seed(0)
+def convert_to_numpy(arr):
+    """Conditional conversion to a numpy array"""
 
-#     # Return a state object
-#     return State(
-#         LeNet5(num_classes=10, dropout=wandb.config['dropout']),
-#         trainset,
-#         wandb.config,
-#     )
+    # Return numpy array
+    return arr.numpy() if isinstance(arr, torch.Tensor) else arr

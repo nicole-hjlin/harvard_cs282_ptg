@@ -12,7 +12,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, Subset
 from torchvision.transforms import ToTensor
-from util import State, convert_to_tensor, get_optimizer
+from util import State, get_optimizer
 from modconn import curves
 from .german import preprocess_german
 from typing import Tuple
@@ -26,14 +26,54 @@ preprocess_funcs = {'german': preprocess_german,
 layers = {'german': [128, 64, 16],
           'heloc': [128, 64, 16]}
 
-def learning_pipeline(S: State) -> nn.Module:
+def get_curve(S: State):
+    """
+    Returns a curve object for the learning pipeline
+    Not yet implemented for FMNIST
+    """
+    if S.config['mode_connect'] == 'bezier':
+        curve_type = curves.Bezier
+    elif S.config['mode_connect'] == 'polychain':
+        curve_type = curves.PolyChain
+    else:
+        raise ValueError(f'Unknown curve type {curve_type}')
+
+    # Create model (with initial parameters)
+    input_size, hidden_layers = S.trainset.data.shape[1], layers[S.trainset.name]
+    model = curves.CurveNet(
+        curve=curve_type,
+        architecture=TabularModelCurve,  # only one TabularModel/TabularModelCurve implemented
+        num_bends=2,
+        input_size=input_size,
+        hidden_layers=hidden_layers,
+        fix_start=False,
+        fix_end=False,
+    )
+
+    # Load initial parameters
+    for i, seed in enumerate([S.seed, S.seed+S.config['n']]):  # use convention of seed, n+seed
+        torch.manual_seed(seed)
+        init_model = S.net(input_size, hidden_layers)
+        model.import_base_parameters(init_model, i)
+    
+    # Reset seed appropriately
+    torch.manual_seed(S.seed)
+
+    # Return curve
+    return model
+
+def learning_pipeline(S) -> nn.Module:
     """Learning pipeline for tabular datasets
     Currently assumes binary classification
     """
 
     # Input size, layers
-    layer = layers[S.trainset.name]
     input_size = S.trainset.data.shape[1]
+    layer = layers[S.trainset.name]
+
+    # Ensure mode_connect is not used with loo
+    if S.config['mode_connect'] != '' and S.config['loo']:
+        raise ValueError("mode_connect not supported with loo")
 
     # Random seed (controls initialization and optimizer stochasticity)
     if S.config['loo']:
@@ -47,15 +87,18 @@ def learning_pipeline(S: State) -> nn.Module:
         print("Training with seed", S.seed)
         print("Run", S.seed)
     
-    # Initialize model (binary classificaiton) and set to train mode
-    S.net = S.net(input_size, layer)
+    # Initialize model (binary classification) and set to train mode
+    if S.config['mode_connect'] == '':
+        S.net = S.net(input_size, layer)
+    else:
+        S.net = get_curve(S)
     S.net.train()
 
     # Set up loss and optimizer
     loss_fn = nn.CrossEntropyLoss()
     optimizer = get_optimizer(S)
 
-    # Set up dataloader
+    # Set up dataloader (NB shuffle=False by default, we ignore effects of shuffling)
     loader = DataLoader(
         S.trainset,
         batch_size=S.config['batch_size'],
@@ -74,9 +117,9 @@ def learning_pipeline(S: State) -> nn.Module:
                 loss = loss_fn(y_pred, y)
                 loss.backward()
                 optimizer.step()
-                if i % 100 == 0:
-                    acc = (y_pred.argmax(-1) == y).float().mean()
-                    if use_wandb:
+                if use_wandb:
+                    if i % 100 == 0:
+                        acc = (y_pred.argmax(-1) == y).float().mean()
                         # Log metrics to wandb
                         wandb.log({
                             'loss': loss,
@@ -357,3 +400,15 @@ class TabularModelCurve(nn.Module):
             else:
                 x = layer(x)
         return x
+
+def convert_to_tensor(arr):
+    """Conditional conversion to a torch tensor"""
+
+    # Return torch tensor
+    return torch.from_numpy(arr) if isinstance(arr, np.ndarray) else arr
+
+def convert_to_numpy(arr):
+    """Conditional conversion to a numpy array"""
+
+    # Return numpy array
+    return arr.numpy() if isinstance(arr, torch.Tensor) else arr

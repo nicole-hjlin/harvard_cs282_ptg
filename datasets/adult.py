@@ -1,11 +1,10 @@
 import torch
 from torch import optim, nn
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 import wandb
 from tqdm import tqdm
-from util import State
+from ..util import State
 import pandas as pd
-from dataset import CSVDataset
 
 
 def preprocessAdultSpecifically(df: pd.DataFrame) -> tuple[torch.Tensor, torch.Tensor]:
@@ -15,37 +14,37 @@ def preprocessAdultSpecifically(df: pd.DataFrame) -> tuple[torch.Tensor, torch.T
     x = x[:,:-1]
     return x, y
 
-dataset = CSVDataset(
-    source_url="https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data",
-    download_path="../data/adult/adult.data",
-    sep=" +",
-    preprocess=preprocessAdultSpecifically,
-)
+# dataset = CSVDataset(
+#     source_url="https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data",
+#     download_path="../data/adult/adult.data",
+#     sep=" +",
+#     preprocess=preprocessAdultSpecifically,
+# )
 
-# dataset, testset = split(dataset)
-testset = CSVDataset(
-    source_url="https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data",
-    download_path="../data/adult/adult.data",
-    sep=" +",
-    preprocess=preprocessAdultSpecifically,
-)
+# # dataset, testset = split(dataset)
+# testset = CSVDataset(
+#     source_url="https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data",
+#     download_path="../data/adult/adult.data",
+#     sep=" +",
+#     preprocess=preprocessAdultSpecifically,
+# )
 
-def state_sampler() -> State:
-    """Sample a state for the learning pipeline"""
-    if wandb.config['loo']:
-        torch.seed()
-        mask = torch.randperm(len(dataset))
-        trainset = Subset(dataset, mask[:int(0.9 * len(mask))])
-        torch.manual_seed(0)
-    else:
-        trainset = dataset
+# def state_sampler() -> State:
+#     """Sample a state for the learning pipeline"""
+#     if wandb.config['loo']:
+#         torch.seed()
+#         mask = torch.randperm(len(dataset))
+#         trainset = Subset(dataset, mask[:int(0.9 * len(mask))])
+#         torch.manual_seed(0)
+#     else:
+#         trainset = dataset
 
-    # Return a state object
-    return State(
-        LeNet5(num_classes=10, dropout=wandb.config['dropout']),
-        trainset,
-        wandb.config,
-    )
+#     # Return a state object
+#     return State(
+#         LeNet5(num_classes=10, dropout=wandb.config['dropout']),
+#         trainset,
+#         wandb.config,
+#     )
 
 
 def learning_pipeline(S: State) -> nn.Module:
