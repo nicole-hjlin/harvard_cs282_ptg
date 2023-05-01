@@ -20,6 +20,7 @@ python3 train.py --name <DATASET NAME> \ # default = heloc
                  --batch_size <BATCH_SIZE> \ # default = 64
                  --dropout <DROPOUT> \ # default = 0
                  --optimizer <OPTIMIZER> \ # default = sgd
+                 --mode_connect <CURVE> \ # default='', train models in pairs with mode connectivity (bezier or polychain)
                  --wandb \ # use to track training with weights and biases
                  --experiment <EXPERIMENT> \ # name of experiment for wandb
 ```
@@ -37,6 +38,7 @@ python3 postprocess.py --loo \ # use for leave-one-out as source of randomness
                        --preds \ # use to save predictions from models
                        --logits \ # use to save logits from models
                        --explanation <EXPLANATION> \ # default = '', use to save explanations by name e.g. gradients, smoothgrad, etc.
+                       --mode_connect <CURVE> \ # default = '', use to load mode connected models (bezier or polychain)
                        --perturb \ # use to perturb weights before saving statistics
                        --config <CONFIG> \ # default = postprocess_config.json, use to select directory/parameters
 ```
