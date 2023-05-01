@@ -2,9 +2,66 @@ import numpy as np
 import math
 import torch
 import torch.nn.functional as F
+from torch import nn
 from torch.nn import Module, Parameter
 from torch.nn.modules.utils import _pair
+from torch.utils.data import Dataset
 from scipy.special import binom
+from tqdm import tqdm
+
+def train_curve(
+    models: list,
+    trainloader: Dataset,
+    curve_class: nn.Module,
+    input_size: int,
+    hidden_layers: list,
+    curve: nn.Module,
+    fix_start: bool,
+    fix_end: bool,
+    optim: str,
+    lr: float,
+    epochs: int,
+    disable_tqdm: bool = True,
+):
+    # Create model (with initial parameters)
+    model = CurveNet(
+        curve=curve,  # e.g. polychain
+        architecture=curve_class,  # e.g. TabularModelCurve
+        num_bends=len(models),
+        input_size=input_size,
+        hidden_layers=hidden_layers,
+        fix_start=fix_start,
+        fix_end=fix_end,
+    )
+    # Load initial parameters
+    for i, base_model in enumerate(models):
+        if base_model is not None:
+            model.import_base_parameters(base_model, i)
+
+    criterion = nn.CrossEntropyLoss()
+    if optim == 'sgd':
+        optimizer = torch.optim.SGD(
+            model.parameters(),#filter(lambda param: param.requires_grad, model.parameters()),
+            lr=lr,
+        )
+    elif optim == 'adam':
+        optimizer = torch.optim.Adam(
+            filter(lambda param: param.requires_grad, model.parameters()),
+            lr=lr,
+        )
+    else:
+        raise ValueError('Invalid optim: %s' % optim)
+
+    model.train()
+    for epoch in tqdm(range(epochs), disable=disable_tqdm):
+        for iter, (input, target) in enumerate(trainloader):
+            optimizer.zero_grad()
+            output = model(input)
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+
+    return model
 
 
 class Bezier(Module):
@@ -253,20 +310,22 @@ class BatchNorm2d(_BatchNorm):
 
 
 class CurveNet(Module):
-    def __init__(self, num_classes, curve, architecture, num_bends,
-                 model_arts, fix_start=True, fix_end=True):
+    def __init__(self, curve, architecture, num_bends,
+                 input_size, hidden_layers, fix_start=True, fix_end=True):
+        """
+        Tabular CurveNet: Not yet implemented for FMNIST
+        """
         super(CurveNet, self).__init__()
-        self.num_classes = num_classes
         self.num_bends = num_bends
         self.fix_points = [fix_start] + [False] * (self.num_bends - 2) + [fix_end]
         
-        self.curve = curve  # PolyChain
-        self.architecture = architecture  #TabularModelCurve
+        self.curve = curve  # e.g. PolyChain
+        self.architecture = architecture  # TabularModelCurve
 
         self.l2 = 0.0
         self.coeff_layer = self.curve(self.num_bends)
-        self.net = self.architecture(input_size=23,
-                                     hidden_layers=[128,64,16],
+        self.net = self.architecture(input_size=input_size,
+                                     hidden_layers=hidden_layers,
                                      fix_points=self.fix_points)
         self.curve_modules = []
         for module in self.net.modules():
@@ -347,7 +406,6 @@ class CurveNet(Module):
         self._compute_l2()
         return output
         
-
 
 def l2_regularizer(weight_decay):
     return lambda model: 0.5 * weight_decay * model.l2

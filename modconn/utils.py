@@ -40,38 +40,6 @@ def save_checkpoint(dir, epoch, name='checkpoint', **kwargs):
     torch.save(state, filepath)
 
 
-def train(train_loader, model, optimizer, criterion, target_loss, regularizer=None, lr_schedule=None):
-    loss_sum = 0.0
-    correct = 0.0
-
-    num_iters = len(train_loader)
-    model.train()
-    for iter, (input, target) in enumerate(train_loader):
-        if lr_schedule is not None:
-            lr = lr_schedule(iter / num_iters)
-            adjust_learning_rate(optimizer, lr)
-        input = input
-        target = target
-
-        output = model(input)
-        loss = criterion(output, target, target_loss)
-        if regularizer is not None:
-            loss += regularizer(model)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        loss_sum += loss.item() * input.size(0)
-        pred = output.data.argmax(1, keepdim=True)
-        correct += pred.eq(target.data.view_as(pred)).sum().item()
-
-    return {
-        'loss': loss_sum / len(train_loader.dataset),
-        'accuracy': correct * 100.0 / len(train_loader.dataset),
-    }
-
-
 def test(test_loader, model, criterion, regularizer=None, **kwargs):
     loss_sum = 0.0
     nll_sum = 0.0
