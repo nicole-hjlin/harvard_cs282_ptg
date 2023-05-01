@@ -3,7 +3,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from util import convert_to_numpy
-import torch
 
 
 ### Helper functions
