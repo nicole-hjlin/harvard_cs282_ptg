@@ -12,36 +12,6 @@ import datasets
 from datasets.tabular import TabularSubset
 from typing import List
 
-def get_model_class(name: str) -> nn.Module:
-    """Returns a model class by dataset name"""
-    if name == 'fmnist':
-        model_class = datasets.fmnist.LeNet5
-    elif name in ['german', 'adult', 'heloc']:
-        model_class = datasets.tabular.TabularModel
-    else:
-        raise ValueError(f'Unknown dataset name: {name}')
-    return model_class
-
-def get_curve_class(name: str) -> nn.Module:
-    """Returns a curve model class by dataset name"""
-    if name == 'fmnist':
-        curve_class = datasets.fmnist.LeNet5Curve
-    elif name in ['german', 'adult', 'heloc']:
-        curve_class = datasets.tabular.TabularModelCurve
-    else:
-        raise ValueError(f'Unknown dataset name: {name}')
-    return curve_class
-
-def get_learning_pipeline(name: str) -> LearningPipeline:
-    """Returns a learning pipeline by dataset name"""
-    if name == 'fmnist':
-        learning_pipeline = datasets.fmnist.learning_pipeline
-    elif name in ['german', 'adult', 'heloc']:
-        learning_pipeline = datasets.tabular.learning_pipeline
-    else:
-        raise ValueError(f'Unknown dataset name: {name}')
-    return learning_pipeline
-
 def get_states(
     n_states: int,
     model: nn.Module,
@@ -72,7 +42,6 @@ def get_states(
             subset = TabularSubset(trainset, mask[:int(0.9 * len(mask))])
         else:
             subset = trainset
-
 
         # Create state
         S = State(
@@ -126,7 +95,8 @@ def train_models(
         model = P(S)
 
         # Save model
-        torch.save(model.state_dict(), f'{directory}/model_{i}.pth')
+        mname = 'model' if config['mode_connect']=='' else config['mode_connect']
+        torch.save(model.state_dict(), f'{directory}/{mname}_{i}.pth')
 
         # Finish wandb run
         if config['wandb']:
@@ -145,6 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=64, help='batch size')
     parser.add_argument('--dropout', type=float, default=0, help='dropout rate')
     parser.add_argument('--optimizer', type=str, default='sgd', help='optimizer (adam or sgd)')
+    parser.add_argument('--mode_connect', type=str, default='', help='train models in pairs with mode connectivity (bezier or polychain)')
     parser.add_argument('--wandb', action='store_true', help='use weights and biases monitoring')
     parser.add_argument('--experiment', type=str, default='training', help='name of experiment for wandb')
 
@@ -161,14 +132,13 @@ if __name__ == '__main__':
     # Number of models to train
     n = config['n']
 
-    # Get learning pipeline from dataset name
-    learning_pipeline = get_learning_pipeline(config['name'])
-
     # Get model class from dataset name
-    model_class = get_model_class(config['name'])
+    model_class = datasets.get_model_class(config['name'])
+
+    # Get learning pipeline from dataset name
+    learning_pipeline = datasets.get_learning_pipeline(config['name'])
 
     # Get list of n states from model class, trainset and config
-    # put everything in config and just pass that?
     states = get_states(n, model_class, trainset, testset, config)
 
     # Train models (one per state in states)
