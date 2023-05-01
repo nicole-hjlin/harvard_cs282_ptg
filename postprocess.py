@@ -5,23 +5,61 @@ import argparse
 import torch
 import numpy as np
 import datasets
+from modconn import curves
 from datasets.tabular import TabularModelPerturb
-from train import get_model_class
+from datasets import get_model_class, get_curve_class
 from style import bold
 from tqdm import tqdm
 
-def load_config(config_file):
+_curve_dict = {'bezier': curves.Bezier, 'polychain': curves.PolyChain}
+
+def _load_config(config_file):
     """Load config from file"""
     with open(config_file, 'r') as f:
         config = json.load(f)
     return config
 
-def load_model(idx):
+def _load_model(idx):
     """Load model from globals (model_class, model_args, directory)"""
-    model = model_class(*model_args)
-    state_dict = torch.load(f'{directory}/model_{idx}.pth')
-    model.load_state_dict(state_dict)
+    # Load perturbed model (implement perturbations for mode connectivity)
+    if mode_connect:
+        model = curves.CurveNet(*curve_args)
+        state_dict = torch.load(f'{directory}/{curve_type}_{idx}.pth')
+        model.load_state_dict(state_dict)
+    else:
+        model = model_class(*model_args)
+        state_dict = torch.load(f'{directory}/model_{idx}.pth')
+        model.load_state_dict(state_dict)
+        if perturb:
+            model = TabularModelPerturb(model, n_weight_perturbations, weight_sigma)  # No FMNIST yet
     return model
+
+def _get_logits():
+    """Get logits from globals (model, model_class, X_test, mode_connect, perturb)"""
+    if mode_connect:
+        if perturb:
+            pass
+        else:
+            logits = model.compute_logits(X_test, model_class, ts).mean(axis=0)
+    else:
+        if perturb:
+            logits = model.forward(torch.FloatTensor(X_test)).detach().numpy().mean(axis=0)
+        else:
+            logits = model.forward(torch.FloatTensor(X_test)).detach().numpy()
+    return logits
+
+def _get_grads():
+    if mode_connect:
+        if perturb:
+            pass
+        else:
+            grads = model.compute_gradients(X_test, model_class, ts).mean(axis=0)
+    else:
+        if perturb:
+            grads = model.compute_gradients(X_test, mean=True)
+        else:
+            grads = model.compute_gradients(X_test, return_numpy=True)
+    return grads
 
 if __name__ == '__main__':
     # Parse arguments
@@ -30,12 +68,13 @@ if __name__ == '__main__':
     parser.add_argument('--preds', action='store_true', help='save predictions')
     parser.add_argument('--logits', action='store_true', help='save logits')
     parser.add_argument('--explanation', type=str, default='', help='save explanations using config file parameters (gradient, smoothgrad, etc.)')
+    parser.add_argument('--mode_connect', action='store_true', help='load mode connected models')
     parser.add_argument('--perturb', action='store_true', help='perturb weights and save mean results')
     parser.add_argument('--config', type=str, default='postprocess_config.json', help='config file to load')
 
     # Get config dictionary
     args = vars(parser.parse_args())
-    config = load_config(args['config'])
+    config = _load_config(args['config'])
     exp = args['explanation']
     if exp != '':
         exp_params = config['explanations'][exp]
@@ -70,57 +109,63 @@ if __name__ == '__main__':
     elif name in ['german', 'adult', 'heloc']:
         model_args = [n_features, datasets.tabular.layers[name]]
 
+    # Perturbation
+    perturb = 'perturb_' if args['perturb'] else ''
+    if perturb:
+        n_weight_perturbations = config['perturb']['n_weight_perturbations']
+        weight_sigma = config['perturb']['weight_sigma']
+
+    # Mode connectivity
+    mode_connect = ''
+    if args['mode_connect']:
+        curve_type = config['mode_connect']['curve_type']
+        mode_connect = curve_type + '_'
+        n_curve_samples = config['mode_connect']['n_curve_samples']
+        ts = np.linspace(0, 1, n_curve_samples)
+        curve_class = get_curve_class(name)
+        curve_args = [_curve_dict[curve_type], curve_class, 2, n_features,
+                      datasets.tabular.layers[name], False, False]
+
+    # Determine statistics to compute
     log = 'logits' if args['logits'] else ''
     pred = 'preds' if args['preds'] else ''
     exp = args['explanation']
 
-    if (log == '') and (pred == '') and (exp == ''):
+    # Compute statistics
+    if not (log or pred or exp):
+        # Nothing to do
         print(bold("Nothing to do! Specify --logits, --preds, or --explanation."))
     else:
-        # Join log, pred and explanation into one string
+        # Which statistics?
         statistics = [s for s in [log, pred, exp] if s]
         stat_str = ', '.join(statistics)
         print(bold(f"Computing statistics for {stat_str}"))
-        if args['perturb']:
+
+        # Perturbation/Mode connectivity
+        if perturb:
             print(bold("Perturbing weights"))
+        if mode_connect:
+            print(bold("Mode connectivity"))
+            print(bold("Curve type:"), curve_type)
+            print(bold("Number of curve samples:"), n_curve_samples)
 
         # Compute statistics
         for i in tqdm(range(config['n'])):
-            # Load model
-            model = load_model(i)
-            if args['perturb']:
-                n_weight_perturbations = config['perturb']['n_weight_perturbations']
-                weight_sigma = config['perturb']['weight_sigma']
-                model = TabularModelPerturb(model, n_weight_perturbations, weight_sigma)  # No FMNIST yet
 
-            # Compute predictions
-            if pred:
-                if args['perturb']:
-                    preds = model.predict(X_test, mean=True)
-                    perturb = 'perturb_mean_'
-                else:
-                    preds = model.predict(X_test, return_numpy=True)
-                    perturb = ''
-                np.save(f'{directory}/preds_{perturb}{i}.npy', preds)
+            # Load model
+            model = _load_model(i)
 
             # Compute logits
-            if log:
-                if args['perturb']:
-                    logits = model.forward(torch.FloatTensor(X_test)).detach().numpy().mean(axis=0)
-                    perturb = 'perturb_'
-                else:
-                    logits = model.forward(torch.FloatTensor(X_test)).detach().numpy()
-                    perturb = ''
-                np.save(f'{directory}/logits_{perturb}{i}.npy', logits)
+            if log or pred:
+                logits = _get_logits()
+                if log:
+                    np.save(f'{directory}/logits_{mode_connect}{perturb}{i}.npy', logits)
+                if pred:
+                    np.save(f'{directory}/preds_{mode_connect}{perturb}{i}.npy', np.argmax(logits, axis=1))
 
             # Compute explanations
             if exp == 'gradient':
-                if args['perturb']:
-                    grads = model.compute_gradients(X_test, mean=True)
-                    perturb = 'perturb_'
-                else:
-                    grads = model.compute_gradients(X_test, return_numpy=True)
-                    perturb = ''
-                np.save(f'{directory}/grads_{perturb}{i}.npy', grads)
+                grads = _get_grads()
+                np.save(f'{directory}/grads_{mode_connect}{perturb}{i}.npy', grads)
             else:
                 pass  # TODO: implement other explanations

@@ -3,10 +3,14 @@
     "n": 1000,
     "hyperparameters": {
         "optimizer": "sgd",
-        "epochs": 20,
+        "epochs": 30,
         "learning_rate": 0.1,
         "batch_size": 64,
         "dropout": 0
+    },
+    "mode_connect": {
+        "curve_type": "bezier",
+        "n_curve_samples": 50
     },
     "perturb": {
         "n_weight_perturbations": 50,

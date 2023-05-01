@@ -405,7 +405,46 @@ class CurveNet(Module):
         output = self.net(input, coeffs_t)
         self._compute_l2()
         return output
-        
+    
+    def get_model_from_curve(self, model_class, t):
+        """
+        Return a model with the same architecture as self.net, but with
+        parameters corresponding to the curve at time t
+
+        # This works, but is slow. Average gradients could be computed directly somehow
+        # using the curve parameters, but this is easier to implement
+        """
+        # Get the weights at t
+        weights = self.weights(t, concatenate=False)
+
+        # Instantiate a new model
+        model = model_class(self.net.input_size,
+                            self.net.hidden_layers) # assumes tabular format
+
+        # Copy over the weights into this TabularModel class instance
+        state_dict = model.state_dict()
+        for i, key in enumerate(state_dict.keys()):
+            state_dict[key] = weights[i]
+        model.load_state_dict(state_dict)
+
+        return model
+    
+    def compute_gradients(self, x, model_class, ts=np.linspace(0,1,50)):
+        """
+        Compute the gradient of the loss with respect to the curve parameters
+        """
+        models = nn.ModuleList(modules=[self.get_model_from_curve(model_class, t) for t in ts])
+        p_curve_grads = [model.compute_gradients(x, return_numpy=True) for model in models]
+        return np.array(p_curve_grads)
+    
+    def compute_logits(self, x, model_class, ts=np.linspace(0,1,50)):
+        """
+        Compute the gradient of the loss with respect to the curve parameters
+        """
+        x = torch.FloatTensor(x)
+        models = nn.ModuleList(modules=[self.get_model_from_curve(model_class, t) for t in ts])
+        logits = [model(x).detach().numpy() for model in models]
+        return np.array(logits)
 
 def l2_regularizer(weight_decay):
     return lambda model: 0.5 * weight_decay * model.l2

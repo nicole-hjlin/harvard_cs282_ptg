@@ -26,7 +26,7 @@ preprocess_funcs = {'german': preprocess_german,
 layers = {'german': [128, 64, 16],
           'heloc': [128, 64, 16]}
 
-def get_curve(S: State):
+def init_curve(S: State):
     """
     Returns a curve object for the learning pipeline
     Not yet implemented for FMNIST
@@ -91,7 +91,7 @@ def learning_pipeline(S) -> nn.Module:
     if S.config['mode_connect'] == '':
         S.net = S.net(input_size, layer)
     else:
-        S.net = get_curve(S)
+        S.net = init_curve(S)
     S.net.train()
 
     # Set up loss and optimizer

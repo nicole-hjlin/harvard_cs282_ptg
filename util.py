@@ -68,3 +68,25 @@ def get_statistics(model_idx, method, directory):
     else:
         raise ValueError(f'Invalid method: {method}')
     return grads, preds
+
+def get_weight_diff(state_dict1, state_dict2):
+    diff = 0
+    for k in state_dict1.keys():
+        diff += np.linalg.norm(state_dict1[k] - state_dict2[k])**2
+    return diff**0.5
+
+def get_weight_norm(state_dict):
+    norm = 0
+    for k in state_dict.keys():
+        norm += np.linalg.norm(state_dict[k])**2
+    return norm**0.5
+
+def linear_weight_interpolation(state_dict1, state_dict2, ts):
+    # Interpolate between two state dicts
+    state_dicts = []
+    for t in ts:
+        state_dict = {}
+        for key in state_dict1.keys():
+            state_dict[key] = state_dict1[key] + (state_dict2[key] - state_dict1[key]) * t
+        state_dicts.append(state_dict)
+    return state_dicts
