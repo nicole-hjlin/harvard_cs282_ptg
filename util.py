@@ -65,6 +65,12 @@ def get_statistics(model_idx, method, directory):
         grads = np.array([np.load(f'{directory}/grads_perturb_{idx}.npy') for idx in model_idx]).mean(axis=0)
         logits = np.array([np.load(f'{directory}/logits_perturb_{idx}.npy') for idx in model_idx])
         preds = logits.mean(axis=0).argmax(axis=1)
+    elif method == 'mode connect':
+        # Take half of the models
+        model_idx = model_idx[:len(model_idx) // 2]
+        grads = np.array([np.load(f'{directory}/grads_bezier_{idx}.npy') for idx in model_idx]).mean(axis=0)
+        logits = np.array([np.load(f'{directory}/logits_bezier_{idx}.npy') for idx in model_idx])
+        preds = logits.mean(axis=0).argmax(axis=1)
     else:
         raise ValueError(f'Invalid method: {method}')
     return grads, preds
