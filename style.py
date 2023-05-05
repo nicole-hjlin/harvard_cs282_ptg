@@ -53,11 +53,7 @@ def plot_single_grad(grad, k=-1):
     plt.bar(range(n_features), grad)
     plt.show()
 
-def plot_accuracies(
-    accs: list[np.ndarray],
-    random_sources: list[str],
-    bins: int = 50,
-):
+def plot_accuracies(accs, random_sources, bins=50):
     """Plot accuracy histograms (columns represent different random sources)"""
 
     nrows, ncols = 1, len(random_sources)
@@ -84,8 +80,8 @@ def plot_figure_3a(
     disagreements_partial: np.ndarray,
     traditional_disagreements: np.ndarray,
     selective_disagreements: np.ndarray,
-    ensemble_sizes: list[int],
-    random_sources: list[str],
+    ensemble_sizes,
+    random_sources,
 ):
     """Plot Figure 3a from the paper (including selective ensembles)"""
 
@@ -125,8 +121,8 @@ def plot_figure_3a(
 
 def print_table_1(
     name: str,
-    accs: list[np.ndarray],
-    random_sources: list[str],
+    accs,
+    random_sources,
 ):
     """Print Table 1 from the paper"""
 
@@ -145,11 +141,11 @@ def print_table_1(
 
 def print_table_2(
     name: str,
-    disagreements_full: list[float],
-    disagreements_partial: list[np.ndarray],
+    disagreements_full,
+    disagreements_partial,
     selective_disagreements: np.ndarray,
-    ensemble_sizes: list[int],
-    random_sources: list[str],
+    ensemble_sizes,
+    random_sources,
 ):
     """Print Table 2 from the paper"""
 
@@ -179,8 +175,8 @@ def print_table_3(
     selective_accs: np.ndarray,
     abstention_rates: np.ndarray,
     traditional_accs: np.ndarray,
-    ensemble_sizes: list[int],
-    random_sources: list[str],
+    ensemble_sizes,
+    random_sources,
 ):
     """Print Table 3 from the paper"""
 
