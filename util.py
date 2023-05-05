@@ -8,6 +8,9 @@ from torch import nn
 from torch.utils.data import Dataset
 import numpy as np
 
+_exp_str_dict = {'gradients': 'grads',
+                 'smoothgrad': 'sg'}
+
 @dataclass
 class State:
     """State object for the learning pipeline"""
@@ -47,14 +50,15 @@ def convert_to_numpy(arr):
     # Return numpy array
     return arr.numpy() if isinstance(arr, torch.Tensor) else arr
 
-def get_statistics(model_idx, method, directory):
+def get_statistics(model_idx, method, directory, exp='gradients'):
+    exp_str = _exp_str_dict[exp]
     if method == 'average':
-        grads = np.array([np.load(f'{directory}/grads_{idx}.npy') for idx in model_idx]).mean(axis=0)
+        grads = np.array([np.load(f'{directory}/{exp_str}_{idx}.npy') for idx in model_idx]).mean(axis=0)
         logits = np.array([np.load(f'{directory}/logits_{idx}.npy') for idx in model_idx])
         preds = logits.mean(axis=0).argmax(axis=1)
     elif method == 'majority':
         logits = np.array([np.load(f'{directory}/logits_{idx}.npy') for idx in model_idx])
-        grads = np.array([np.load(f'{directory}/grads_{idx}.npy') for idx in model_idx])
+        grads = np.array([np.load(f'{directory}/{exp_str}_{idx}.npy') for idx in model_idx])
         preds = np.zeros(logits.shape[1], dtype=int)
         preds[logits.argmax(2).mean(axis=0) >= 0.5] = 1
         majority_votes = (logits.argmax(axis=2) == preds)
@@ -62,13 +66,13 @@ def get_statistics(model_idx, method, directory):
         selected_grads = np.where(majority_votes[:, :, None], grads, 0)
         grads = selected_grads.sum(axis=0) / num_majority_votes[:, None]
     elif method == 'perturb':
-        grads = np.array([np.load(f'{directory}/grads_perturb_{idx}.npy') for idx in model_idx]).mean(axis=0)
+        grads = np.array([np.load(f'{directory}/{exp_str}_perturb_{idx}.npy') for idx in model_idx]).mean(axis=0)
         logits = np.array([np.load(f'{directory}/logits_perturb_{idx}.npy') for idx in model_idx])
         preds = logits.mean(axis=0).argmax(axis=1)
     elif method == 'mode connect':
         # Take half of the models
         model_idx = model_idx[:len(model_idx) // 2]
-        grads = np.array([np.load(f'{directory}/grads_bezier_{idx}.npy') for idx in model_idx]).mean(axis=0)
+        grads = np.array([np.load(f'{directory}/{exp_str}_bezier_{idx}.npy') for idx in model_idx]).mean(axis=0)
         logits = np.array([np.load(f'{directory}/logits_bezier_{idx}.npy') for idx in model_idx])
         preds = logits.mean(axis=0).argmax(axis=1)
     else:
@@ -76,12 +80,18 @@ def get_statistics(model_idx, method, directory):
     return grads, preds
 
 def get_weight_diff(state_dict1, state_dict2):
+    if isinstance(state_dict1, nn.Module):
+        state_dict1 = state_dict1.state_dict()
+    if isinstance(state_dict2, nn.Module):
+        state_dict2 = state_dict2.state_dict()
     diff = 0
     for k in state_dict1.keys():
         diff += np.linalg.norm(state_dict1[k] - state_dict2[k])**2
     return diff**0.5
 
 def get_weight_norm(state_dict):
+    if isinstance(state_dict, nn.Module):
+        state_dict = state_dict.state_dict()
     norm = 0
     for k in state_dict.keys():
         norm += np.linalg.norm(state_dict[k])**2
