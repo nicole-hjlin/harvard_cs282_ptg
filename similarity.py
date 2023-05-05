@@ -31,6 +31,19 @@ def average_ground_truth_score(X, signs_X, gt, signs_gt, metric_func):
 
     return scores
 
+def ground_truth_score(X, signs_x, gt, signs_gt, metric_func):
+    """
+    As in average_ground_truth_score
+    but returns a vector of size (n_trials, n_inputs)
+    """
+    n_trials, n_inputs, k = X.shape
+    scores = np.zeros((n_trials, n_inputs))
+
+    for i in range(n_trials):
+        scores[i] = metric_func(X[i], gt, signs_x[i], signs_gt)
+
+    return scores
+
 def average_pairwise_score(X, signs_X, metric_func):
     """Compute the average pairwise score across trials.
     Input size is (n_trials, n_inputs, k)
@@ -177,3 +190,47 @@ def top_k_consistency(top_k):
         consistency[input_idx] = total_consistency / num_pairs
 
     return consistency
+
+def angle_diff(a, b, degrees=True):
+    """
+    Computes the angle between two vectors
+    assumes a and b are normalized
+    a and b have shape (n_inputs, n_features)
+    angle has shape (n_inputs)
+    """
+    # Assumes a and b are normalized
+    d = np.linalg.norm(a-b, axis=1)/2
+    angle = np.arcsin(d)*2
+    if degrees:
+        angle *= 180/np.pi
+    return angle
+
+def average_pairwise_score_grad(grads, metric_func):
+    """
+    grads has shape (n_models, n_inputs, 2)
+    and is not normalized
+    angles has shape (n_inputs)
+    and is the average angle between all
+    pairs of models for each input
+    """
+    norm_grads = grads/np.linalg.norm(grads, axis=2)[:, :, np.newaxis]
+    n_models, n_inputs, _ = grads.shape
+    scores = np.zeros(n_inputs)
+    for i in range(n_models):
+        for j in range(i+1, n_models):
+            scores += metric_func(norm_grads[i], norm_grads[j])
+
+    total_pairs = n_models*(n_models-1)/2
+    scores /= total_pairs
+    
+    return scores
+
+def cosine_similarity(a, b):
+    """
+    Computes the cosine similarity between two vectors
+    a and b have shape (n_inputs, n_features)
+    assumes a and b are normalized
+    """
+    d = np.linalg.norm(a-b, axis=1)
+    cosine = (1 - d**2)/2
+    return cosine
