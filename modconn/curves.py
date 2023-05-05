@@ -38,10 +38,17 @@ def train_curve(
         if base_model is not None:
             model.import_base_parameters(base_model, i)
 
+    # r, t = 0, 0
+    # for param in list(model.parameters()):
+    #     if param.requires_grad:
+    #         r += 1
+    #     t += 1
+    # print('Number of trainable parameters: %d/%d' % (r, t))
+
     criterion = nn.CrossEntropyLoss()
     if optim == 'sgd':
         optimizer = torch.optim.SGD(
-            model.parameters(),#filter(lambda param: param.requires_grad, model.parameters()),
+            filter(lambda param: param.requires_grad, model.parameters()),
             lr=lr,
         )
     elif optim == 'adam':
@@ -398,8 +405,6 @@ class CurveNet(Module):
 
     def forward(self, input, t=None):
         if t is None:
-            # t = np.random.normal(0, 1)
-            # t = (t+3)/6
             t = input.data.new(1).uniform_()
         coeffs_t = self.coeff_layer(t)
         output = self.net(input, coeffs_t)
