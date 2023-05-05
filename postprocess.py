@@ -61,6 +61,22 @@ def _get_grads():
             grads = model.compute_gradients(X_test, return_numpy=True)
     return grads
 
+def _get_sg():
+    if mode_connect:
+        if perturb:
+            pass
+        else:
+            sg = model.compute_gradients(noisy_x, model_class, ts).mean(axis=0)
+            sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
+    else:
+        if perturb:
+            sg = model.compute_gradients(noisy_x, mean=True)
+            sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
+        else:
+            sg = model.compute_gradients(noisy_x, return_numpy=True)
+            sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
+    return sg
+
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser()
@@ -149,6 +165,20 @@ if __name__ == '__main__':
             print(bold("Curve type:"), curve_type)
             print(bold("Number of curve samples:"), n_curve_samples)
 
+        # Fixed smoothgrad perturbations
+        if exp == 'smoothgrad':
+            print(bold("Fixed smoothgrad perturbations"))
+            n_input_perturbations = config['explanations']['smoothgrad']['n_input_perturbations']
+            sg_sigma = config['explanations']['smoothgrad']['input_sigma']
+            print(bold("Number of smoothgrad perturbations:"), n_input_perturbations)
+            print(bold("Smoothgrad sigma:"), sg_sigma)
+            np.random.seed(0)
+            noise = np.random.normal(scale=sg_sigma,
+                                     size=(n_input_perturbations,
+                                           n_inputs, n_features))
+            noisy_x = np.vstack([np.expand_dims(X_test, axis=0)] * n_input_perturbations) + noise
+            noisy_x = noisy_x.reshape(-1, n_features)
+
         # Compute statistics
         for i in tqdm(range(config['n'])):
 
@@ -167,5 +197,8 @@ if __name__ == '__main__':
             if exp == 'gradient':
                 grads = _get_grads()
                 np.save(f'{directory}/grads_{mode_connect}{perturb}{i}.npy', grads)
+            elif exp == 'smoothgrad':
+                sg = _get_sg()
+                np.save(f'{directory}/sg_{mode_connect}{perturb}{i}.npy', sg)
             else:
                 pass  # TODO: implement other explanations
