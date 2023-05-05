@@ -24,7 +24,8 @@ download_urls = {'german': 'https://archive.ics.uci.edu/ml/machine-learning-data
 preprocess_funcs = {'german': preprocess_german,
                     'heloc': None}
 layers = {'german': [128, 64, 16],
-          'heloc': [128, 64, 16]}
+          'heloc': [128, 64, 16],
+          'moons': [128, 64, 16]}
 
 def init_curve(S: State):
     """
@@ -338,9 +339,121 @@ class TabularModel(nn.Module):
 
         return grads
     
+    def compute_smoothgrad(self, x):
+        """Compute SmoothGrad of the model with respect to the input
+        Flexible to take in tensor or numpy array
+        Shape of x is (no. inputs, no. features) or (no. features)
+        Returns tensor or numpy array depending on return_numpy"""
+
+        # Convert input to tensor if it's a numpy array
+        x = convert_to_tensor(x)
+
+        # If single input, add batch dimension
+        if len(x.shape) == 1:
+            x = x.unsqueeze(0)
+
+        # Compute SmoothGrad
+        self.eval()
+        x = x.float()
+        x.requires_grad = True
+        out = self(x)[:, 1]
+        grads = torch.autograd.grad(outputs=out, inputs=x,
+                                    grad_outputs=torch.ones_like(out))[0]
+        grads = grads.detach().numpy()
+        return grads
+    
     def compute_perturbed_gradients(self, x, sigma=0.5, n=100):
         perturbed_model = TabularModelPerturb(self, n, sigma)
         return perturbed_model.compute_gradients(x)
+    
+    def get_activation(self, x, idx_act, idx_warmstart=None, pre_act=False):
+        if idx_warmstart is None:
+            idx_warmstart = -1
+        for idx, layer in enumerate(self.network[idx_warmstart+1:idx_act+1]):
+            x = layer(x)
+        return x
+    
+class LinearAct(nn.Module):
+    def __init__(self, previous_layer_size, layer_size):
+        super(LinearAct, self).__init__()
+        self.linear = nn.Linear(previous_layer_size, layer_size)
+        self.act = nn.ReLU()
+
+    def forward(self, x):
+        return self.act(self.linear(x))
+    
+class TabularModelAlign(nn.Module):
+    """Tabular model for binary classification"""
+    def __init__(self, input_size, hidden_layers):
+        super(TabularModelAlign, self).__init__()
+        self.input_size = input_size
+        self.hidden_layers = hidden_layers
+
+        self.layers = []
+        previous_layer_size = input_size
+        for layer_size in hidden_layers:
+            self.layers.append(LinearAct(previous_layer_size, layer_size))
+            previous_layer_size = layer_size
+        self.layers.append(LinearAct(previous_layer_size, 2))
+        self.network = nn.Sequential(*self.layers)
+
+    def forward(self, x):
+        """Forward pass of the model (softmax output)"""
+        return self.network(x)
+
+    def predict(self, x, return_numpy=False):
+        """Predict method, returns hard predictions
+        Flexible to take in tensor or numpy array
+        Shape of x is (no. inputs, no. features)
+        Returns numpy array if return_numpy is True"""
+
+        # Convert input to tensor if it's a numpy array
+        x = convert_to_tensor(x)
+
+        # Forward pass and argmax for hard prediction
+        self.eval()
+        with torch.no_grad():  # save memory (inference only)
+            preds = self(x.float()).argmax(dim=1)  # argmax of logits
+
+        # Return hard predictions
+        if return_numpy:
+            return preds.detach().numpy()
+        return preds
+
+    def compute_gradients(self, x, label=1, return_numpy=False):
+        """Compute gradients of the model with respect to the input
+        Flexible to take in tensor or numpy array
+        Shape of x is (no. inputs, no. features) or (no. features)
+        Returns tensor or numpy array depending on return_numpy"""
+
+        # Convert input to tensor if it's a numpy array
+        x = convert_to_tensor(x)
+
+        # If single input, add batch dimension
+        if len(x.shape) == 1:
+            x = x.unsqueeze(0)
+
+        # Compute gradients
+        self.eval()
+        x = x.float()
+        x.requires_grad = True
+        out = self(x)[:, label]
+        grads = torch.autograd.grad(outputs=out, inputs=x,
+                                    grad_outputs=torch.ones_like(out))[0]
+
+        # Convert to numpy array if return_numpy is True
+        if return_numpy:
+            grads = grads.detach().numpy()
+
+        return grads
+    
+    def get_activation(self, x, idx_act, idx_warmstart=None):
+        if idx_warmstart is None:
+            idx_warmstart = -1
+        for idx, layer in enumerate(self.network[idx_warmstart+1:idx_act+1]):
+            x = layer(x)
+        return x
+
 
 class TabularModelPerturb(nn.Module):
     def __init__(self, base_model, num_perturbations, sigma):
@@ -378,7 +491,7 @@ class TabularModelPerturb(nn.Module):
 
 class TabularModelCurve(nn.Module):
     """Tabular curve model for binary classification"""
-    def __init__(self, input_size, hidden_layers, fix_points: list[bool]):
+    def __init__(self, input_size, hidden_layers, fix_points):
         super(TabularModelCurve, self).__init__()
         self.input_size = input_size
         self.hidden_layers = hidden_layers
