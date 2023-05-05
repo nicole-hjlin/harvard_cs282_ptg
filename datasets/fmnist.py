@@ -156,7 +156,7 @@ class LeNet5(nn.Module):
 class LeNet5Curve(nn.Module):
     """LeNet5 curve model class for FashionMNIST dataset"""
 
-    def __init__(self, num_classes: int, fix_points: list[bool], dropout: float = 0.0):
+    def __init__(self, num_classes, fix_points, dropout=0.0):
         super(LeNet5Curve, self).__init__()
         self.conv1 = curves.Conv2d(1, 6, kernel_size=5, stride=1, padding=2, fix_points=fix_points)
         self.batch1 = curves.BatchNorm2d(6, fix_points=fix_points)
