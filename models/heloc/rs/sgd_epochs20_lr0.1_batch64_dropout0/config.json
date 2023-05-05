@@ -1,1 +1,1 @@
-{"name": "heloc", "n": 1000, "loo": false, "lr": 0.1, "epochs": 20, "batch_size": 64, "dropout": 0, "optimizer": "sgd", "wandb": false, "experiment": "training"}
+{"name": "heloc", "n": 1000, "hyperparameters": {"optimizer": "sgd", "epochs": 20, "learning_rate": 0.1, "batch_size": 64, "dropout": 0}, "perturb": {"n_weight_perturbations": 50, "weight_sigma": 0.1}, "explanations": {"gradient": {}, "smoothgrad": {"n_input_perturbations": 50, "input_sigma": 0.1}}}
