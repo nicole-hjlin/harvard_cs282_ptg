@@ -28,7 +28,8 @@ preprocess_funcs = {'german': preprocess_german,
                     'default': preprocess_default}
 layers = {'german': [128, 64, 16],
           'heloc': [128, 64, 16],
-          'moons': [128, 64, 16]}
+          'moons': [128, 64, 16],
+          'default': [128, 64, 16]}
 
 def init_curve(S: State):
     """
