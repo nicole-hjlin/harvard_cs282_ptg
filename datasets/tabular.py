@@ -15,14 +15,17 @@ from torchvision.transforms import ToTensor
 from util import State, get_optimizer
 from modconn import curves
 from .german import preprocess_german
+from .default import preprocess_default
 from typing import Tuple
 
 
 # Would be cleaner if these were included in their respective files actually
 download_urls = {'german': 'https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german/german.data',
-                 'heloc': None}
+                 'heloc': None,
+                 'default': 'https://archive.ics.uci.edu/ml/machine-learning-databases/00350/default%20of%20credit%20card%20clients.xls'}
 preprocess_funcs = {'german': preprocess_german,
-                    'heloc': None}
+                    'heloc': None,
+                    'default': preprocess_default}
 layers = {'german': [128, 64, 16],
           'heloc': [128, 64, 16],
           'moons': [128, 64, 16]}
