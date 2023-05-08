@@ -456,7 +456,8 @@ class TabularModelAlign(nn.Module):
 
 
 class TabularModelPerturb(nn.Module):
-    def __init__(self, base_model, num_perturbations, sigma):
+    def __init__(self, base_model, num_perturbations, sigma,
+                 perturb_layers=['network.0.weight']):
         super().__init__()
         self.num_perturbations = num_perturbations
 
@@ -465,10 +466,11 @@ class TabularModelPerturb(nn.Module):
             model = TabularModel(base_model.input_size, base_model.hidden_layers)
             model.load_state_dict(base_model.state_dict())
             with torch.no_grad():
-                layer_weights = model.state_dict()['network.0.weight']
-                #torch.manual_seed(i)  # reproducibility
-                noise = torch.randn_like(layer_weights) * sigma
-                layer_weights.add_(noise)
+                for layer_name in perturb_layers:
+                    layer_weights = model.state_dict()[layer_name]
+                    #torch.manual_seed(i)  # reproducibility
+                    noise = torch.randn_like(layer_weights) * sigma
+                    layer_weights.add_(noise)
             self.models.append(model)
 
     def forward(self, x):
@@ -488,6 +490,12 @@ class TabularModelPerturb(nn.Module):
         if mean:
             return np.array(grads).mean(axis=0)
         return np.array(grads)
+    
+    def compute_logits(self, x, mean=True):
+        logits = self(torch.FloatTensor(x)).detach().numpy()
+        if mean:
+            return logits.mean(axis=0)
+        return logits
 
 class TabularModelCurve(nn.Module):
     """Tabular curve model for binary classification"""
