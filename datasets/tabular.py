@@ -462,14 +462,15 @@ class TabularModelPerturb(nn.Module):
         self.num_perturbations = num_perturbations
 
         self.models = nn.ModuleList()
+        sigmas = sigma if isinstance(sigma, list) else [sigma] * len(perturb_layers)
         for i in range(num_perturbations):
             model = TabularModel(base_model.input_size, base_model.hidden_layers)
             model.load_state_dict(base_model.state_dict())
             with torch.no_grad():
-                for layer_name in perturb_layers:
+                for j, layer_name in enumerate(perturb_layers):
                     layer_weights = model.state_dict()[layer_name]
                     #torch.manual_seed(i)  # reproducibility
-                    noise = torch.randn_like(layer_weights) * sigma
+                    noise = torch.randn_like(layer_weights) * sigmas[j]
                     layer_weights.add_(noise)
             self.models.append(model)
 
