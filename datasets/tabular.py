@@ -15,20 +15,26 @@ from torchvision.transforms import ToTensor
 from util import State, get_optimizer
 from modconn import curves
 from .german import preprocess_german
-from .default import preprocess_default
 from typing import Tuple
 
 
 # Would be cleaner if these were included in their respective files actually
 download_urls = {'german': 'https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german/german.data',
                  'heloc': None,
-                 'default': 'https://archive.ics.uci.edu/ml/machine-learning-databases/00350/default%20of%20credit%20card%20clients.xls'}
+                 'default': 'https://archive.ics.uci.edu/ml/machine-learning-databases/00350/default%20of%20credit%20card%20clients.xls',
+                 'gmsc': None,
+                 'adult': None}
 preprocess_funcs = {'german': preprocess_german,
                     'heloc': None,
-                    'default': preprocess_default}
+                    'default': None,
+                    'gmsc': None,
+                    'adult': None}
 layers = {'german': [128, 64, 16],
           'heloc': [128, 64, 16],
-          'moons': [128, 64, 16]}
+          'moons': [128, 64, 16],
+          'default': [128, 64, 16],
+          'gmsc': [128, 64, 16],
+          'adult': [128, 64, 16]}
 
 def init_curve(S: State):
     """
@@ -214,6 +220,7 @@ class TabularDataset(Dataset):
         # Assuming the labels column is called 'label'
         labels = data['label']
         data = data.drop(columns=['label'])
+        self.feature_names = data.columns
 
         # Retrieve values as numpy arrays
         data = data.values
@@ -365,9 +372,15 @@ class TabularModel(nn.Module):
         grads = grads.detach().numpy()
         return grads
     
-    def compute_perturbed_gradients(self, x, sigma=0.5, n=100):
-        perturbed_model = TabularModelPerturb(self, n, sigma)
-        return perturbed_model.compute_gradients(x)
+    def compute_perturbed_stats(self, x, x_full=None, n=100, sigmas=[0.5],
+                                perturb_layers=['network.0.weight']):
+        if x_full is None:
+            x_full = x
+        perturbed_model = TabularModelPerturb(self, n, sigmas=sigmas,
+                                              perturb_layers=perturb_layers)
+        grads = perturbed_model.compute_gradients(x)
+        preds = perturbed_model.predict(x_full)
+        return grads, preds
     
     def get_activation(self, x, idx_act, idx_warmstart=None, pre_act=False):
         if idx_warmstart is None:
@@ -459,21 +472,28 @@ class TabularModelAlign(nn.Module):
 
 
 class TabularModelPerturb(nn.Module):
-    def __init__(self, base_model, num_perturbations, sigma,
-                 perturb_layers=['network.0.weight']):
+    def __init__(self, base_model, num_perturbations, sigmas=[0.1],
+                 perturb_layers='all', train=None):
         super().__init__()
+        self.base_model = base_model
         self.num_perturbations = num_perturbations
+        if perturb_layers == 'all':
+            self.perturb_layers = list(base_model.state_dict().keys())
+        else:
+            self.perturb_layers = perturb_layers
+        self.sigmas = sigmas if isinstance(sigmas, list) else [sigmas] * len(self.perturb_layers)
 
         self.models = nn.ModuleList()
-        sigmas = sigma if isinstance(sigma, list) else [sigma] * len(perturb_layers)
+        self.scalars = self.compute_scalars(train)
         for i in range(num_perturbations):
             model = TabularModel(base_model.input_size, base_model.hidden_layers)
             model.load_state_dict(base_model.state_dict())
             with torch.no_grad():
-                for j, layer_name in enumerate(perturb_layers):
+                for j, layer_name in enumerate(self.perturb_layers):
                     layer_weights = model.state_dict()[layer_name]
                     #torch.manual_seed(i)  # reproducibility
-                    noise = torch.randn_like(layer_weights) * sigmas[j]
+                    noise = torch.randn_like(layer_weights)
+                    noise *= self.scalars[j] * self.sigmas[j]
                     layer_weights.add_(noise)
             self.models.append(model)
 
@@ -481,12 +501,50 @@ class TabularModelPerturb(nn.Module):
         outputs = [model(x) for model in self.models]
         return torch.stack(outputs, dim=0)
     
+    def compute_scalars(self, train):
+        if train is None:
+            scalars = [1] * len(self.perturb_layers)
+            # for layer_name in self.perturb_layers:
+            #     layer_weights = self.base_model.state_dict()[layer_name]
+            #     d = layer_weights.flatten().shape[0]
+            #     scalars.append(1 / np.sqrt(d))
+            return scalars
+        X_train, y_train = train
+        X_train.requires_grad = True
+        self.base_model.eval()
+        self.base_model.zero_grad()
+        y_pred = self.base_model(X_train)
+        loss_fn = nn.CrossEntropyLoss()
+        loss = loss_fn(y_pred, y_train)
+        loss.backward()
+
+        # Compute grad_squared for each layer
+        grad_vec = []
+        for name, param in self.base_model.named_parameters():
+            if name in self.perturb_layers:
+                grad_vec.append(1/((param.grad**2)+1e-16))
+
+        # This whole process is to avoid overflow (might be cleaner to flatten)
+        norm = sum([(grad_vec[i]**2).sum() for i in range(len(grad_vec))]).sqrt()
+        grad_vec = [grad_vec[i] / norm for i in range(len(grad_vec))]
+
+        # # Take reciprocal of scalars
+        # scalars = [1/g for g in grad_vec]
+        # # Replace inf with max value
+        # for i in range(len(scalars)):
+        #     scalars[i][torch.isinf(scalars[i])] = scalars[i][~torch.isinf(scalars[i])].max()
+        # # Normalize scalars
+        # squares_inv = sum([(scalars[i]**2).sum() for i in range(len(scalars))])
+        # scalars = [scalars[i] / squares_inv.sqrt() for i in range(len(scalars))]
+
+        return [g**0.5 for g in grad_vec]
+
     def predict(self, x, mean=True):
         logits = self(torch.FloatTensor(x))
         if mean:
-            preds = logits.mean(axis=0).argmax(1)
+            preds = logits.mean(axis=0).argmax(-1)
         else:
-            preds = logits.argmax(2)
+            preds = logits.argmax(-1)
         return preds.detach().numpy()
     
     def compute_gradients(self, x, mean=True):
@@ -500,6 +558,7 @@ class TabularModelPerturb(nn.Module):
         if mean:
             return logits.mean(axis=0)
         return logits
+
 
 class TabularModelCurve(nn.Module):
     """Tabular curve model for binary classification"""
@@ -537,3 +596,41 @@ def convert_to_numpy(arr):
 
     # Return numpy array
     return arr.numpy() if isinstance(arr, torch.Tensor) else arr
+
+
+# class TabularModelCurvePerturb(nn.Module):
+#     """Tabular curve model perturbed"""
+#     def __init__(self, base_curve, ts, perturb_args):
+#         super().__init__()
+#         self.pert_models = nn.ModuleList()
+#         for t in ts:
+#             pert_model = base_curve.get_model_from_curve(TabularModel, t,
+#                                                          TabularModelPerturb,
+#                                                          *perturb_args)
+#             self.pert_models.append(pert_model)
+
+#     def forward(self, x):
+#         outputs = [model(x) for model in self.pert_models]
+#         return torch.stack(outputs, dim=0)
+    
+#     def compute_gradients(self, x, mean=True):
+#         grads = [model.compute_gradients(x, mean=False) for model in self.pert_models]
+#         if mean:
+#             return np.array(grads).mean(axis=(0,1))
+#         return np.array(grads)
+    
+#     def compute_logits(self, x, mean=True):
+#         logits = self(torch.FloatTensor(x)).detach().numpy()
+#         if mean:
+#             return logits.mean(axis=(0,1))
+#         return logits
+    
+#     def compute_perturbed_stats(self, x, x_long=None):
+#         if x_long is None:
+#             x_long = x
+#         grads = np.array([pert_mod.compute_gradients(x)\
+#                           for pert_mod in self.pert_models]).mean(axis=0)
+#         logits = np.array([pert_mod.compute_logits(x_long)\
+#                             for pert_mod in self.pert_models]).mean(axis=0)
+#         preds = logits.argmax(axis=-1)
+#         return grads, preds
