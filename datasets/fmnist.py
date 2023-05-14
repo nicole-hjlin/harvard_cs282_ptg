@@ -9,7 +9,7 @@ from tqdm import tqdm
 from typing import Tuple
 import math
 import numpy as np
-from modconn import curves
+import curves
 
 def load_fmnist_dataset() -> Tuple[datasets.FashionMNIST, datasets.FashionMNIST]:
     """
