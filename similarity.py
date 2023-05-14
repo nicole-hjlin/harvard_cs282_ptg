@@ -130,18 +130,26 @@ def top_k_cdc(x, y, signs_x, signs_y):
 
     return cdc_scores.astype(float)
 
-def top_k_ssa(k, x, y, signs_x, signs_y):
-    ''' Returns Signed Set *Agreement* (i.e., 1 means perfect agreement)'''
-    # First, we need to satisfy CDC, so check that first: 
-    limited_sx = signs_x[np.arange(x.shape[0])[:,None], x]
-    limited_sy = signs_y[np.arange(x.shape[0])[:,None], x]
-    xeq = (limited_sx == limited_sy)#  + (-1) * (limited_sx != limited_sy)
-    limited_sx = signs_x[np.arange(y.shape[0])[:,None], y]
-    limited_sy = signs_y[np.arange(y.shape[0])[:,None], y]
-    yeq = (limited_sx == limited_sy)
-    cdc = np.logical_and(np.all(xeq == 1, axis=1), np.all(yeq == 1, axis=1))
+def top_k_ssa(x, y, signs_x, signs_y):
+    """
+    Returns Signed Set *Agreement* (i.e., 1 means perfect agreement)
+    x and y are n_inputs x k arrays (top-k per input)
+    signs_x and signs_y are n_inputs x k arrays (signs of top-k per input)
+    cdc has size n_inputs
+    scores has size n_inputs
+    """ 
+    # First, we need to satisfy CDC, so check that first:
+    # limited_sx = signs_x[np.arange(x.shape[0])[:,None], x]
+    # limited_sy = signs_y[np.arange(x.shape[0])[:,None], x]
+    # xeq = (limited_sx == limited_sy)#  + (-1) * (limited_sx != limited_sy)
+    # limited_sx = signs_x[np.arange(y.shape[0])[:,None], y]
+    # limited_sy = signs_y[np.arange(y.shape[0])[:,None], y]
+    # yeq = (limited_sx == limited_sy)
+    # cdc = np.logical_and(np.all(xeq == 1, axis=1), np.all(yeq == 1, axis=1))
+    cdc = top_k_cdc(x, y, signs_x, signs_y)
 
     # Next, we need to know whether X and Y have the same top-k features
+    k = x.shape[1]
     res = np.zeros([x.shape[0],k])
     for i in range(x.shape[0]):
         for j in range(k):
@@ -154,8 +162,8 @@ def top_k_ssa(k, x, y, signs_x, signs_y):
 
     # now, frac_right is 1 if x and y have the same top-K features, and cdc is 1 if all of X's top-K features have the same sign in Y
     # so, we need to return 1 if both are true and 0 otherwise
-    scores = np.logical_and(frac_right, cdc)
-    return sum(scores)/len(scores)
+    scores = np.logical_and(frac_right, cdc).astype(float)
+    return scores
 
 # Replace this to be similar to top_k_sa, leave pairwise comparisons to average_pairwise_score
 
