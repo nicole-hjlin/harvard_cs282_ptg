@@ -5,7 +5,7 @@ import argparse
 import torch
 import numpy as np
 import datasets
-from modconn import curves
+import curves
 from datasets.tabular import TabularModel, TabularModelPerturb
 from datasets import get_model_class, get_curve_class
 from style import bold
