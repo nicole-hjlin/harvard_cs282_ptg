@@ -1,1 +1,0 @@
-{"name": "heloc", "n": 1000, "loo": true, "lr": 0.0004, "epochs": 30, "batch_size": 32, "dropout": 0, "optimizer": "adam", "wandb": false, "experiment": "training"}
