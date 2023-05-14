@@ -10,7 +10,7 @@ def load_dataset(name):
         return tabular.load_tabular_dataset(name)
     else:
         raise ValueError(f"Unknown dataset: {name}")
-    
+
 def get_model_class(name: str):
     """Returns a model class by dataset name"""
     if name == 'fmnist':
