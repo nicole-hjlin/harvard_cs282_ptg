@@ -1,7 +1,7 @@
 import datasets.fmnist as fmnist
 import datasets.tabular as tabular
 
-_tabular_datasets = ['german', 'adult', 'heloc', 'default']
+_tabular_datasets = ['german', 'adult', 'heloc', 'default', 'gmsc']
 
 def load_dataset(name):
     if name == 'fmnist':
