@@ -411,7 +411,7 @@ class CurveNet(Module):
         self._compute_l2()
         return output
     
-    def get_model_from_curve(self, model_class, t):
+    def get_model_from_curve(self, model_class, t, perturb_class=None, perturb_args=None):
         """
         Return a model with the same architecture as self.net, but with
         parameters corresponding to the curve at time t
@@ -431,15 +431,20 @@ class CurveNet(Module):
         for i, key in enumerate(state_dict.keys()):
             state_dict[key] = weights[i]
         model.load_state_dict(state_dict)
-
+        if perturb_class is not None:
+            model = perturb_class(model, *perturb_args)
         return model
     
-    def compute_gradients(self, x, model_class, ts=np.linspace(0,1,50)):
+    def compute_gradients(self, x, model_class, ts=np.linspace(0,1,50), perturb_class=None, perturb_args=None):
         """
         Compute the gradient of the loss with respect to the curve parameters
         """
-        models = nn.ModuleList(modules=[self.get_model_from_curve(model_class, t) for t in ts])
-        p_curve_grads = [model.compute_gradients(x, return_numpy=True) for model in models]
+        models = nn.ModuleList(modules=[self.get_model_from_curve(model_class, t, perturb_class, perturb_args) for t in ts])
+        
+        if perturb_class is not None:
+            p_curve_grads = [model.compute_gradients(x, mean=True) for model in models]
+        else:
+            p_curve_grads = [model.compute_gradients(x, return_numpy=True) for model in models]
         return np.array(p_curve_grads)
     
     def compute_logits(self, x, model_class, ts=np.linspace(0,1,50)):
@@ -450,6 +455,54 @@ class CurveNet(Module):
         models = nn.ModuleList(modules=[self.get_model_from_curve(model_class, t) for t in ts])
         logits = [model(x).detach().numpy() for model in models]
         return np.array(logits)
+    
+    def compute_losses(self, x, y, loss_fn, model_class, ts=np.linspace(0,1,50)):
+        """
+        Compute the gradient of the loss with respect to the curve parameters
+        """
+        x = torch.FloatTensor(x)
+        y = torch.tensor(y)
+        models = nn.ModuleList(modules=[self.get_model_from_curve(model_class, t) for t in ts])
+        losses = [loss_fn(model(x), y).detach().numpy() for model in models]
+        return np.array(losses)
+    
+    def compute_perturbed_stats(self, x, model_class, perturb_class,
+                                perturb_args, x_full=None,
+                                ts=np.linspace(0,1,50)):
+        if x_full is None:
+            x_full = x
+
+        pert_models = nn.ModuleList()
+        for t in ts:
+            pert_model = self.get_model_from_curve(model_class, t,
+                                                   perturb_class,
+                                                   perturb_args)
+            pert_models.append(pert_model)
+
+        grads = np.array([pert_mod.compute_gradients(x)\
+                          for pert_mod in pert_models]).mean(axis=0)
+        logits = np.array([pert_mod.compute_logits(x_full)\
+                            for pert_mod in pert_models]).mean(axis=0)
+        preds = logits.argmax(axis=-1)
+        return grads, preds
+    
+class CurveNetPerturb(Module):
+    def __init__(self, base_curve, model_class, perturb_class,
+                 perturb_args, ts=np.linspace(0,1,50)):
+        super().__init__()
+        mods = [base_curve.get_model_from_curve(model_class, t,
+                                                perturb_class,
+                                                perturb_args) for t in ts]
+        self.pert_models = nn.ModuleList(modules=mods)
+
+    def compute_gradients(self, x):
+        return np.array([pert_mod.compute_gradients(x)\
+                         for pert_mod in self.pert_models]).mean(axis=0)
+    
+    def compute_logits(self, x):
+        return np.array([pert_mod.compute_logits(x)\
+                         for pert_mod in self.pert_models]).mean(axis=0)
+
 
 def l2_regularizer(weight_decay):
     return lambda model: 0.5 * weight_decay * model.l2
