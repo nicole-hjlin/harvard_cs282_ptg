@@ -3,13 +3,17 @@
 import json
 import argparse
 import torch
+import time
+import multiprocess as mp
 import numpy as np
 import datasets
 from modconn import curves
-from datasets.tabular import TabularModelPerturb
+from multiprocessing import set_start_method
+from datasets.tabular import TabularModelPerturb, device
 from datasets import get_model_class, get_curve_class
 from style import bold
 from tqdm import tqdm
+from joblib import Parallel, delayed
 
 _curve_dict = {'bezier': curves.Bezier, 'polychain': curves.PolyChain}
 
@@ -32,9 +36,10 @@ def _load_model(idx):
         model.load_state_dict(state_dict)
         if perturb:
             model = TabularModelPerturb(model, n_weight_perturbations, weight_sigma)  # No FMNIST yet
+    model = model.to(device)
     return model
 
-def _get_logits():
+def _get_logits(model):
     """Get logits from globals (model, model_class, X_test, mode_connect, perturb)"""
     if mode_connect:
         if perturb:
@@ -43,12 +48,12 @@ def _get_logits():
             logits = model.compute_logits(X_test, model_class, ts).mean(axis=0)
     else:
         if perturb:
-            logits = model.forward(torch.FloatTensor(X_test)).detach().numpy().mean(axis=0)
+            logits = model.forward(torch.FloatTensor(X_test)).detach().cpu().numpy().mean(axis=0)
         else:
-            logits = model.forward(torch.FloatTensor(X_test)).detach().numpy()
+            logits = model.forward(torch.FloatTensor(X_test)).detach().cpu().numpy()
     return logits
 
-def _get_grads():
+def _get_grads(model):
     if mode_connect:
         if perturb:
             pass
@@ -61,7 +66,7 @@ def _get_grads():
             grads = model.compute_gradients(X_test, return_numpy=True)
     return grads
 
-def _get_sg():
+def _get_sg(model):
     if mode_connect:
         if perturb:
             pass
@@ -179,15 +184,16 @@ if __name__ == '__main__':
             noisy_x = np.vstack([np.expand_dims(X_test, axis=0)] * n_input_perturbations) + noise
             noisy_x = noisy_x.reshape(-1, n_features)
 
-        # Compute statistics
-        for i in tqdm(range(config['n'])):
-
+        # TODO(ltang): clean this up
+        # def _workhorse(i, log, pred, directory, mode_connect, perturb):
+        def _workhorse(i):
+            print(f"workhorse i: {i}")
             # Load model
             model = _load_model(i)
 
             # Compute logits
             if log or pred:
-                logits = _get_logits()
+                logits = _get_logits(model)
                 if log:
                     np.save(f'{directory}/logits_{mode_connect}{perturb}{i}.npy', logits)
                 if pred:
@@ -195,10 +201,22 @@ if __name__ == '__main__':
 
             # Compute explanations
             if exp == 'gradient':
-                grads = _get_grads()
+                grads = _get_grads(model)
                 np.save(f'{directory}/grads_{mode_connect}{perturb}{i}.npy', grads)
             elif exp == 'smoothgrad':
-                sg = _get_sg()
+                sg = _get_sg(model)
                 np.save(f'{directory}/sg_{mode_connect}{perturb}{i}.npy', sg)
+            elif exp == 'shap':
+                pass
             else:
                 pass  # TODO: implement other explanations
+
+        # # Compute statistics
+        # for i in tqdm(range(config['n'])):
+        set_start_method('spawn')
+        # pool = mp.Pool(4)
+        # pool.map(_workhorse, range(config['n']))
+
+        start = time.time()
+        Parallel(n_jobs=16)(delayed(_workhorse)(x) for x in range(config['n']))
+        print(f"Total time: {time.time() - start}")
