@@ -9,9 +9,56 @@ import curves
 from datasets.tabular import TabularModel, TabularModelPerturb
 from datasets import get_model_class, get_curve_class
 from style import bold
+from multiprocessing import set_start_method
+from joblib import Parallel, delayed
+import joblib
 from tqdm import tqdm
+import contextlib
+import time
 
 _curve_dict = {'bezier': curves.Bezier, 'polychain': curves.PolyChain}
+
+@contextlib.contextmanager
+def tqdm_joblib(tqdm_object):
+    """Context manager to patch joblib to report into tqdm progress bar given as argument"""
+    class TqdmBatchCompletionCallback(joblib.parallel.BatchCompletionCallBack):
+        def __call__(self, *args, **kwargs):
+            tqdm_object.update(n=self.batch_size)
+            return super().__call__(*args, **kwargs)
+
+    old_batch_callback = joblib.parallel.BatchCompletionCallBack
+    joblib.parallel.BatchCompletionCallBack = TqdmBatchCompletionCallback
+    try:
+        yield tqdm_object
+    finally:
+        joblib.parallel.BatchCompletionCallBack = old_batch_callback
+        tqdm_object.close()
+
+def _workhorse(i):
+    # Load model
+    model = _load_model(i)
+
+    # Compute logits
+    if log or pred:
+        logits = _get_logits(model)
+        if log:
+            np.save(f'{directory}/logits_{mode_connect}{perturb}{i}.npy', logits)
+        if pred:
+            np.save(f'{directory}/preds_{mode_connect}{perturb}{i}.npy', np.argmax(logits, axis=1))
+
+    # Compute explanations
+    if exp == 'gradient':
+        grads = _get_grads(model)
+        np.save(f'{directory}/grads_{mode_connect}{perturb}{i}.npy', grads)
+    elif exp == 'smoothgrad':
+        sg = _get_sg(model)
+        np.save(f'{directory}/sg_{mode_connect}{perturb}{i}.npy', sg)
+    elif exp == 'shap':
+        shaps = _get_shap(model)
+        np.save(f'{directory}/shaps_{mode_connect}{perturb}{i}.npy', shaps)
+    else:
+        pass  # TODO: implement other explanations
+    #print(f"workhorse {i} complete")
 
 def _load_config(config_file, name):
     """Load config from file"""
@@ -37,9 +84,11 @@ def _load_model(idx):
         if perturb:
             model = TabularModelPerturb(model, n_weight_perturbations,
                                         weight_sigmas, weight_layers)  # No FMNIST yet
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
     return model
 
-def _get_logits():
+def _get_logits(model):
     """Get logits from globals (model, model_class, X_test_full, mode_connect, perturb)"""
     if mode_connect:
         if perturb:
@@ -53,7 +102,7 @@ def _get_logits():
             logits = model.forward(torch.FloatTensor(X_test_full)).detach().numpy()
     return logits
 
-def _get_grads():
+def _get_grads(model):
     if mode_connect:
         if perturb:
             grads = model.compute_gradients(X_test)
@@ -66,7 +115,7 @@ def _get_grads():
             grads = model.compute_gradients(X_test, return_numpy=True)
     return grads
 
-def _get_sg():
+def _get_sg(model):
     if mode_connect:
         if perturb:
             sg = model.compute_gradients(noisy_x)
@@ -206,26 +255,8 @@ if __name__ == '__main__':
             noisy_x = np.vstack([np.expand_dims(X_test, axis=0)] * n_input_perturbations) + noise
             noisy_x = noisy_x.reshape(-1, n_features)
 
-        # Compute statistics
-        for i in tqdm(range(config['n'])):
-
-            # Load model
-            model = _load_model(i)
-
-            # Compute logits
-            if log or pred:
-                logits = _get_logits()
-                if log:
-                    np.save(f'{directory}/logits_{mode_connect}{perturb}{i}.npy', logits)
-                if pred:
-                    np.save(f'{directory}/preds_{mode_connect}{perturb}{i}.npy', np.argmax(logits, axis=-1))
-
-            # Compute explanations
-            if exp == 'gradient':
-                grads = _get_grads()
-                np.save(f'{directory}/grads_{mode_connect}{perturb}{i}.npy', grads)
-            elif exp == 'smoothgrad':
-                sg = _get_sg()
-                np.save(f'{directory}/sg_{mode_connect}{perturb}{i}.npy', sg)
-            else:
-                pass  # TODO: implement other explanations
+        start_time = time.time()
+        set_start_method('spawn')
+        with tqdm_joblib(tqdm(desc="Computing Statistics", total=config['n'])) as progress_bar:
+            Parallel(n_jobs=16)(delayed(_workhorse)(i) for i in range(config['n']))
+        print(bold(f"Total time: {time.time() - start_time} seconds"))
