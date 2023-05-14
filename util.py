@@ -61,9 +61,13 @@ def get_statistics(model_idx, method, directory, exp='gradients'):
         grads = np.array([np.load(f'{directory}/{exp_str}_{idx}.npy') for idx in model_idx])
         preds = np.zeros(logits.shape[1], dtype=int)
         preds[logits.argmax(2).mean(axis=0) >= 0.5] = 1
-        majority_votes = (logits.argmax(axis=2) == preds)
+
+        preds_trunc = preds[:grads.shape[1]]
+        logits_trunc = logits[:, :grads.shape[1]]
+        majority_votes = (logits_trunc.argmax(axis=2) == preds_trunc)
         num_majority_votes = majority_votes.sum(axis=0)
         selected_grads = np.where(majority_votes[:, :, None], grads, 0)
+        
         grads = selected_grads.sum(axis=0) / num_majority_votes[:, None]
     elif method == 'perturb':
         grads = np.array([np.load(f'{directory}/{exp_str}_perturb_{idx}.npy') for idx in model_idx]).mean(axis=0)
@@ -71,9 +75,14 @@ def get_statistics(model_idx, method, directory, exp='gradients'):
         preds = logits.mean(axis=0).argmax(axis=1)
     elif method == 'mode connect':
         # Take half of the models
-        model_idx = model_idx[:len(model_idx) // 2]
+        model_idx = model_idx[:len(model_idx)//2]
         grads = np.array([np.load(f'{directory}/{exp_str}_bezier_{idx}.npy') for idx in model_idx]).mean(axis=0)
         logits = np.array([np.load(f'{directory}/logits_bezier_{idx}.npy') for idx in model_idx])
+        preds = logits.mean(axis=0).argmax(axis=1)
+    elif method == 'combined':
+        model_idx = model_idx[:len(model_idx)//2]
+        grads = np.array([np.load(f'{directory}/{exp_str}_bezier_perturb_{idx}.npy') for idx in model_idx]).mean(axis=0)
+        logits = np.array([np.load(f'{directory}/logits_bezier_perturb_{idx}.npy') for idx in model_idx])
         preds = logits.mean(axis=0).argmax(axis=1)
     else:
         raise ValueError(f'Invalid method: {method}')
@@ -98,6 +107,10 @@ def get_weight_norm(state_dict):
     return norm**0.5
 
 def linear_weight_interpolation(state_dict1, state_dict2, ts):
+    if isinstance(state_dict1, nn.Module):
+        state_dict1 = state_dict1.state_dict()
+    if isinstance(state_dict2, nn.Module):
+        state_dict2 = state_dict2.state_dict()
     # Interpolate between two state dicts
     state_dicts = []
     for t in ts:
