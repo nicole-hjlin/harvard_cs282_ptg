@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, Subset
 from torchvision.transforms import ToTensor
 from util import State, get_optimizer
-from modconn import curves
+import curves
 from .german import preprocess_german
 from typing import Tuple
 
