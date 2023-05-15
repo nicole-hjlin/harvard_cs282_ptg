@@ -495,6 +495,10 @@ class CurveNetPerturb(Module):
                                                 perturb_args) for t in ts]
         self.pert_models = nn.ModuleList(modules=mods)
 
+    def forward(self, x):
+        outputs = [pert_mod(x) for pert_mod in self.pert_models]
+        return torch.stack(outputs, dim=0).mean(axis=0)
+
     def compute_gradients(self, x):
         return np.array([pert_mod.compute_gradients(x)\
                          for pert_mod in self.pert_models]).mean(axis=0)

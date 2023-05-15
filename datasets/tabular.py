@@ -72,6 +72,7 @@ def init_curve(S: State):
     # Return curve
     return model
 
+
 def learning_pipeline(S) -> nn.Module:
     """Learning pipeline for tabular datasets
     Currently assumes binary classification
@@ -153,6 +154,7 @@ def learning_pipeline(S) -> nn.Module:
     # Return the trained model
     return S.net
 
+
 class TabularSubset(Subset):
     def __init__(self, dataset, indices):
         super().__init__(dataset, indices)
@@ -161,6 +163,7 @@ class TabularSubset(Subset):
         self.name = dataset.name
         self.data = dataset.data[indices]
         self.labels = dataset.labels[indices]
+
 
 class TabularDataset(Dataset):
     """
@@ -245,6 +248,7 @@ class TabularDataset(Dataset):
         label = self.labels[idx]
         return sample, label
 
+
 def load_tabular_dataset(name: str) -> Tuple[TabularDataset, TabularDataset]:
     """Load tabular dataset, return train and test sets
     If neither train nor test file exists,
@@ -275,6 +279,7 @@ def load_tabular_dataset(name: str) -> Tuple[TabularDataset, TabularDataset]:
 
     # Return train/test sets
     return trainset, testset
+
 
 class TabularModel(nn.Module):
     """Tabular model for binary classification"""
@@ -381,94 +386,6 @@ class TabularModel(nn.Module):
         grads = perturbed_model.compute_gradients(x)
         preds = perturbed_model.predict(x_full)
         return grads, preds
-    
-    def get_activation(self, x, idx_act, idx_warmstart=None, pre_act=False):
-        if idx_warmstart is None:
-            idx_warmstart = -1
-        for idx, layer in enumerate(self.network[idx_warmstart+1:idx_act+1]):
-            x = layer(x)
-        return x
-    
-class LinearAct(nn.Module):
-    def __init__(self, previous_layer_size, layer_size):
-        super(LinearAct, self).__init__()
-        self.linear = nn.Linear(previous_layer_size, layer_size)
-        self.act = nn.ReLU()
-
-    def forward(self, x):
-        return self.act(self.linear(x))
-    
-class TabularModelAlign(nn.Module):
-    """Tabular model for binary classification"""
-    def __init__(self, input_size, hidden_layers):
-        super(TabularModelAlign, self).__init__()
-        self.input_size = input_size
-        self.hidden_layers = hidden_layers
-
-        self.layers = []
-        previous_layer_size = input_size
-        for layer_size in hidden_layers:
-            self.layers.append(LinearAct(previous_layer_size, layer_size))
-            previous_layer_size = layer_size
-        self.layers.append(LinearAct(previous_layer_size, 2))
-        self.network = nn.Sequential(*self.layers)
-
-    def forward(self, x):
-        """Forward pass of the model (softmax output)"""
-        return self.network(x)
-
-    def predict(self, x, return_numpy=False):
-        """Predict method, returns hard predictions
-        Flexible to take in tensor or numpy array
-        Shape of x is (no. inputs, no. features)
-        Returns numpy array if return_numpy is True"""
-
-        # Convert input to tensor if it's a numpy array
-        x = convert_to_tensor(x)
-
-        # Forward pass and argmax for hard prediction
-        self.eval()
-        with torch.no_grad():  # save memory (inference only)
-            preds = self(x.float()).argmax(dim=1)  # argmax of logits
-
-        # Return hard predictions
-        if return_numpy:
-            return preds.detach().numpy()
-        return preds
-
-    def compute_gradients(self, x, label=1, return_numpy=False):
-        """Compute gradients of the model with respect to the input
-        Flexible to take in tensor or numpy array
-        Shape of x is (no. inputs, no. features) or (no. features)
-        Returns tensor or numpy array depending on return_numpy"""
-
-        # Convert input to tensor if it's a numpy array
-        x = convert_to_tensor(x)
-
-        # If single input, add batch dimension
-        if len(x.shape) == 1:
-            x = x.unsqueeze(0)
-
-        # Compute gradients
-        self.eval()
-        x = x.float()
-        x.requires_grad = True
-        out = self(x)[:, label]
-        grads = torch.autograd.grad(outputs=out, inputs=x,
-                                    grad_outputs=torch.ones_like(out))[0]
-
-        # Convert to numpy array if return_numpy is True
-        if return_numpy:
-            grads = grads.detach().numpy()
-
-        return grads
-    
-    def get_activation(self, x, idx_act, idx_warmstart=None):
-        if idx_warmstart is None:
-            idx_warmstart = -1
-        for idx, layer in enumerate(self.network[idx_warmstart+1:idx_act+1]):
-            x = layer(x)
-        return x
 
 
 class TabularModelPerturb(nn.Module):
@@ -499,7 +416,7 @@ class TabularModelPerturb(nn.Module):
 
     def forward(self, x):
         outputs = [model(x) for model in self.models]
-        return torch.stack(outputs, dim=0)
+        return torch.stack(outputs, dim=0).mean(axis=0)
     
     def compute_scalars(self, train):
         if train is None:
@@ -554,10 +471,10 @@ class TabularModelPerturb(nn.Module):
         return np.array(grads)
     
     def compute_logits(self, x, mean=True):
-        logits = self(torch.FloatTensor(x)).detach().numpy()
+        logits = [model(x).detach().numpy() for model in self.models]
         if mean:
-            return logits.mean(axis=0)
-        return logits
+            return np.array(logits).mean(axis=0)
+        return np.array(logits)
 
 
 class TabularModelCurve(nn.Module):
@@ -585,52 +502,16 @@ class TabularModelCurve(nn.Module):
                 x = layer(x)
         return x
 
+
 def convert_to_tensor(arr):
     """Conditional conversion to a torch tensor"""
 
     # Return torch tensor
-    return torch.from_numpy(arr) if isinstance(arr, np.ndarray) else arr
+    return torch.FloatTensor(arr) if isinstance(arr, np.ndarray) else arr
+
 
 def convert_to_numpy(arr):
     """Conditional conversion to a numpy array"""
 
     # Return numpy array
     return arr.numpy() if isinstance(arr, torch.Tensor) else arr
-
-
-# class TabularModelCurvePerturb(nn.Module):
-#     """Tabular curve model perturbed"""
-#     def __init__(self, base_curve, ts, perturb_args):
-#         super().__init__()
-#         self.pert_models = nn.ModuleList()
-#         for t in ts:
-#             pert_model = base_curve.get_model_from_curve(TabularModel, t,
-#                                                          TabularModelPerturb,
-#                                                          *perturb_args)
-#             self.pert_models.append(pert_model)
-
-#     def forward(self, x):
-#         outputs = [model(x) for model in self.pert_models]
-#         return torch.stack(outputs, dim=0)
-    
-#     def compute_gradients(self, x, mean=True):
-#         grads = [model.compute_gradients(x, mean=False) for model in self.pert_models]
-#         if mean:
-#             return np.array(grads).mean(axis=(0,1))
-#         return np.array(grads)
-    
-#     def compute_logits(self, x, mean=True):
-#         logits = self(torch.FloatTensor(x)).detach().numpy()
-#         if mean:
-#             return logits.mean(axis=(0,1))
-#         return logits
-    
-#     def compute_perturbed_stats(self, x, x_long=None):
-#         if x_long is None:
-#             x_long = x
-#         grads = np.array([pert_mod.compute_gradients(x)\
-#                           for pert_mod in self.pert_models]).mean(axis=0)
-#         logits = np.array([pert_mod.compute_logits(x_long)\
-#                             for pert_mod in self.pert_models]).mean(axis=0)
-#         preds = logits.argmax(axis=-1)
-#         return grads, preds
