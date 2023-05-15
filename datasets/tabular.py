@@ -300,6 +300,7 @@ class TabularModel(nn.Module):
 
     def forward(self, x):
         """Forward pass of the model (softmax output)"""
+        x = convert_to_tensor(x)
         return self.network(x)
 
     def predict(self, x, return_numpy=False):
@@ -415,6 +416,7 @@ class TabularModelPerturb(nn.Module):
             self.models.append(model)
 
     def forward(self, x):
+        x = convert_to_tensor(x)
         outputs = [model(x) for model in self.models]
         return torch.stack(outputs, dim=0).mean(axis=0)
     
