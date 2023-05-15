@@ -15,6 +15,7 @@ import joblib
 from tqdm import tqdm
 import contextlib
 import time
+import shap
 
 _curve_dict = {'bezier': curves.Bezier, 'polychain': curves.PolyChain}
 
@@ -97,7 +98,7 @@ def _get_logits(model):
             logits = model.compute_logits(X_test_full, model_class, ts).mean(axis=0)
     else:
         if perturb:
-            logits = model.forward(torch.FloatTensor(X_test_full)).detach().numpy().mean(axis=0)
+            logits = model.compute_logits(X_test_full, mean=True)
         else:
             logits = model.forward(torch.FloatTensor(X_test_full)).detach().numpy()
     return logits
@@ -119,18 +120,27 @@ def _get_sg(model):
     if mode_connect:
         if perturb:
             sg = model.compute_gradients(noisy_x)
-            sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
         else:
             sg = model.compute_gradients(noisy_x, model_class, ts).mean(axis=0)
-            sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
     else:
         if perturb:
-            sg = model.compute_gradients(torch.FloatTensor(noisy_x), mean=True)
-            sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
+            sg = model.compute_gradients(noisy_x, mean=True)
         else:
-            sg = model.compute_gradients(torch.FloatTensor(noisy_x), return_numpy=True)
-            sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
+            sg = model.compute_gradients(noisy_x, return_numpy=True)
+    sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
     return sg
+
+def _get_shap(model):
+    if mode_connect and not perturb:
+        # Instantiate CurveNetPerturb for its desired forward function
+        shap_model = curves.CurveNetPerturb(model, TabularModel,
+                                            perturb_class=None,
+                                            perturb_args=None, ts=ts)
+    else:
+        shap_model = model
+    explainer = shap.DeepExplainer(shap_model, torch.FloatTensor(X_train_shap))
+    shap_vals = explainer.shap_values(torch.FloatTensor(X_test))[1]
+    return shap_vals
 
 if __name__ == '__main__':
     # Parse arguments
@@ -256,6 +266,9 @@ if __name__ == '__main__':
             noisy_x = np.vstack([np.expand_dims(X_test, axis=0)] * n_input_perturbations) + noise
             noisy_x = noisy_x.reshape(-1, n_features)
 
+        elif exp == 'shap':
+            X_train_shap = trainset.data.numpy()[:100]
+            X_test = X_test[:100]
 
         # Run in parallel
         if args['parallel']:

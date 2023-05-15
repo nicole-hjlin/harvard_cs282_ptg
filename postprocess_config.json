@@ -1,31 +1,32 @@
 {
-    "gmsc": {
+    "adult": {
         "n": 1000,
         "hyperparameters": {
             "optimizer": "adam",
-            "epochs": 20,
-            "learning_rate": 0.0004,
-            "batch_size": 32,
+            "epochs": 40,
+            "learning_rate": 0.004,
+            "batch_size": 128,
             "dropout": 0
         },
         "mode_connect": {
             "curve_type": "bezier",
             "n_curve_samples": 10,
             "n_curve_perturbations": 50,
-            "curve_perturb_sigmas": [0.05],
-            "curve_perturb_layers": ["network.0.bias"]
+            "curve_perturb_sigmas": [0.3],
+            "curve_perturb_layers": ["network.0.weight"]
         },
         "perturb": {
             "n_weight_perturbations": 50,
-            "weight_sigmas": [0.05],
-            "weight_layers": ["network.0.bias"]
+            "weight_sigmas": [0.3],
+            "weight_layers": ["network.0.weight"]
         },
         "explanations": {
             "gradient": {},
             "smoothgrad": {
                 "n_input_perturbations": 50,
                 "input_sigma": 0.1
-            }
+            },
+            "shap": {}
         }
     },
     "default": {
@@ -54,36 +55,8 @@
             "smoothgrad": {
                 "n_input_perturbations": 50,
                 "input_sigma": 0.1
-            }
-        }
-    },
-    "adult": {
-        "n": 1000,
-        "hyperparameters": {
-            "optimizer": "adam",
-            "epochs": 40,
-            "learning_rate": 0.004,
-            "batch_size": 128,
-            "dropout": 0
-        },
-        "mode_connect": {
-            "curve_type": "bezier",
-            "n_curve_samples": 10,
-            "n_curve_perturbations": 50,
-            "curve_perturb_sigmas": [0.3],
-            "curve_perturb_layers": ["network.0.weight"]
-        },
-        "perturb": {
-            "n_weight_perturbations": 50,
-            "weight_sigmas": [0.3],
-            "weight_layers": ["network.0.weight"]
-        },
-        "explanations": {
-            "gradient": {},
-            "smoothgrad": {
-                "n_input_perturbations": 50,
-                "input_sigma": 0.1
-            }
+            },
+            "shap": {}
         }
     },
     "german": {
@@ -112,7 +85,38 @@
             "smoothgrad": {
                 "n_input_perturbations": 50,
                 "input_sigma": 0.1
-            }
+            },
+            "shap": {}
+        }
+    },
+    "gmsc": {
+        "n": 1000,
+        "hyperparameters": {
+            "optimizer": "adam",
+            "epochs": 20,
+            "learning_rate": 0.0004,
+            "batch_size": 32,
+            "dropout": 0
+        },
+        "mode_connect": {
+            "curve_type": "bezier",
+            "n_curve_samples": 10,
+            "n_curve_perturbations": 50,
+            "curve_perturb_sigmas": [0.05],
+            "curve_perturb_layers": ["network.0.bias"]
+        },
+        "perturb": {
+            "n_weight_perturbations": 50,
+            "weight_sigmas": [0.05],
+            "weight_layers": ["network.0.bias"]
+        },
+        "explanations": {
+            "gradient": {},
+            "smoothgrad": {
+                "n_input_perturbations": 50,
+                "input_sigma": 0.1
+            },
+            "shap": {}
         }
     },
     "heloc": {
@@ -141,7 +145,8 @@
             "smoothgrad": {
                 "n_input_perturbations": 50,
                 "input_sigma": 0.1
-            }
+            },
+            "shap": {}
         }
     }
 }
