@@ -9,7 +9,8 @@ from torch.utils.data import Dataset
 import numpy as np
 
 _exp_str_dict = {'gradients': 'grads',
-                 'smoothgrad': 'sg'}
+                 'smoothgrad': 'sg',
+                 'shap': 'shaps'}
 
 @dataclass
 class State:
