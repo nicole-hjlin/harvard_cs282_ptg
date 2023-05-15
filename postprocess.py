@@ -85,20 +85,20 @@ def _load_model(idx):
         if perturb:
             model = TabularModelPerturb(model, n_weight_perturbations,
                                         weight_sigmas, weight_layers)  # No FMNIST yet
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # model = model.to(device)
     return model
 
 def _get_logits(model):
     """Get logits from globals (model, model_class, X_test_full, mode_connect, perturb)"""
     if mode_connect:
         if perturb:
-            logits = model.compute_logits(X_test_full)
+            logits = model.compute_logits(torch.FloatTensor(X_test_full))
         else:
-            logits = model.compute_logits(X_test_full, model_class, ts).mean(axis=0)
+            logits = model.compute_logits(torch.FloatTensor(X_test_full), model_class, ts).mean(axis=0)
     else:
         if perturb:
-            logits = model.compute_logits(X_test_full, mean=True)
+            logits = model.compute_logits(torch.FloatTensor(X_test_full), mean=True)
         else:
             logits = model.forward(torch.FloatTensor(X_test_full)).detach().numpy()
     return logits
