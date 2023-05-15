@@ -6,9 +6,10 @@ import torch
 import numpy as np
 import datasets
 import curves
-from datasets.tabular import TabularModel, TabularModelPerturb, TabularModelCurve
+from datasets.tabular import TabularModel, TabularModelPerturb
+from datasets import get_model_class, get_curve_class
 from style import bold
-from multiprocessing import set_start_method
+from multiprocessing import set_start_method, cpu_count
 from joblib import Parallel, delayed
 import joblib
 from tqdm import tqdm
@@ -33,7 +34,7 @@ def tqdm_joblib(tqdm_object):
         joblib.parallel.BatchCompletionCallBack = old_batch_callback
         tqdm_object.close()
 
-def _workhorse(i):
+def _get_model_stats(i):
     # Load model
     model = _load_model(i)
 
@@ -66,7 +67,7 @@ def _load_config(config_file, name):
     return config[name]
 
 def _load_model(idx):
-    """Load model from globals (model_args, directory, mode_perturb_args, ts)"""
+    """Load model from globals (model_class, model_args, directory, mode_perturb_args, ts)"""
     # Load perturbed model (implement perturbations for mode connectivity)
     if mode_connect:
         model = curves.CurveNet(*curve_args)
@@ -77,23 +78,23 @@ def _load_model(idx):
                                            TabularModelPerturb,
                                            mode_perturb_args, ts=ts)
     else:
-        model = TabularModel(*model_args)
+        model = model_class(*model_args)
         state_dict = torch.load(f'{directory}/model_{idx}.pth')
         model.load_state_dict(state_dict)
         if perturb:
             model = TabularModelPerturb(model, n_weight_perturbations,
-                                        weight_sigmas, weight_layers)
+                                        weight_sigmas, weight_layers)  # No FMNIST yet
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     return model
 
-def _get_logits(model, ):
-    """Get logits from globals (model, TabularModel, X_test_full, mode_connect, perturb)"""
+def _get_logits(model):
+    """Get logits from globals (model, model_class, X_test_full, mode_connect, perturb)"""
     if mode_connect:
         if perturb:
             logits = model.compute_logits(X_test_full)
         else:
-            logits = model.compute_logits(X_test_full, TabularModel, ts).mean(axis=0)
+            logits = model.compute_logits(X_test_full, model_class, ts).mean(axis=0)
     else:
         if perturb:
             logits = model.forward(torch.FloatTensor(X_test_full)).detach().numpy().mean(axis=0)
@@ -106,7 +107,7 @@ def _get_grads(model):
         if perturb:
             grads = model.compute_gradients(X_test)
         else:
-            grads = model.compute_gradients(X_test, TabularModel, ts).mean(axis=0)
+            grads = model.compute_gradients(X_test, model_class, ts).mean(axis=0)
     else:
         if perturb:
             grads = model.compute_gradients(X_test, mean=True)
@@ -120,14 +121,14 @@ def _get_sg(model):
             sg = model.compute_gradients(noisy_x)
             sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
         else:
-            sg = model.compute_gradients(noisy_x, TabularModel, ts).mean(axis=0)
+            sg = model.compute_gradients(noisy_x, model_class, ts).mean(axis=0)
             sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
     else:
         if perturb:
-            sg = model.compute_gradients(noisy_x, mean=True)
+            sg = model.compute_gradients(torch.FloatTensor(noisy_x), mean=True)
             sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
         else:
-            sg = model.compute_gradients(noisy_x, return_numpy=True)
+            sg = model.compute_gradients(torch.FloatTensor(noisy_x), return_numpy=True)
             sg = sg.reshape(n_input_perturbations, n_inputs, n_features).mean(axis=0)
     return sg
 
@@ -142,6 +143,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode_connect', action='store_true', help='load mode connected models')
     parser.add_argument('--perturb', action='store_true', help='perturb weights and save mean results')
     parser.add_argument('--config', type=str, default='postprocess_config.json', help='config file to load')
+    parser.add_argument('--parallel', action='store_true', help='run in parallel')
 
     # Get config dictionary
     args = vars(parser.parse_args())
@@ -157,7 +159,7 @@ if __name__ == '__main__':
     print(bold("Dataset:"), name)
     trainset, testset = datasets.load_dataset(name)
     X_test_full, y_test_full = testset.data.numpy(), testset.labels.numpy()
-    if X_test_full.shape[0] > 1000:
+    if name in ['default', 'fmnist', 'gmsc', 'adult', 'heloc']:
         X_test, y_test = X_test_full[:1000], y_test_full[:1000]
         if exp != '':
             print("Computing explanation metrics for first 1000 test points")
@@ -181,7 +183,11 @@ if __name__ == '__main__':
         json.dump(config, f)
 
     # Determine model class and arguments
-    model_args = [n_features, datasets.tabular.layers[name]]
+    model_class = get_model_class(name)
+    if name == 'fmnist':
+        model_args = [10, dropout]
+    elif name in datasets._tabular_datasets:
+        model_args = [n_features, datasets.tabular.layers[name]]
 
     # Perturbation
     perturb = 'perturb_' if args['perturb'] else ''
@@ -197,7 +203,8 @@ if __name__ == '__main__':
         mode_connect = curve_type + '_'
         n_curve_samples = config['mode_connect']['n_curve_samples']
         ts = np.linspace(0, 1, n_curve_samples)
-        curve_args = [_curve_dict[curve_type], TabularModelCurve, 2, n_features,
+        curve_class = get_curve_class(name)
+        curve_args = [_curve_dict[curve_type], curve_class, 2, n_features,
                       datasets.tabular.layers[name], False, False]
         if perturb:
             n_pert_mode = config['mode_connect']['n_curve_perturbations']
@@ -249,8 +256,22 @@ if __name__ == '__main__':
             noisy_x = np.vstack([np.expand_dims(X_test, axis=0)] * n_input_perturbations) + noise
             noisy_x = noisy_x.reshape(-1, n_features)
 
-        start_time = time.time()
-        set_start_method('spawn')
-        with tqdm_joblib(tqdm(desc="Computing Statistics", total=config['n'])) as progress_bar:
-            Parallel(n_jobs=16)(delayed(_workhorse)(i) for i in range(config['n']))
-        print(bold(f"Total time: {time.time() - start_time} seconds"))
+
+        # Run in parallel
+        if args['parallel']:
+            print(bold("Running in parallel"))
+            start_time = time.time()
+            set_start_method('spawn')
+            num_cores = cpu_count()
+            print(bold("Number of cores:"), num_cores)
+            with tqdm_joblib(tqdm(desc="Computing Statistics", total=config['n'])) as progress_bar:
+                Parallel(n_jobs=num_cores)(delayed(_get_model_stats)(i) for i in range(config['n']))
+            print(bold(f"Total time: {time.time() - start_time} seconds"))
+        
+        else:
+            # Run sequentially
+            print(bold("Running sequentially"))
+            start_time = time.time()
+            for i in tqdm(range(config['n']), desc="Computing Statistics"):
+                _get_model_stats(i)
+            print(bold(f"Total time: {time.time() - start_time} seconds"))
