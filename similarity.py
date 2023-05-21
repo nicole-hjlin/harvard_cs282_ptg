@@ -1,4 +1,13 @@
 import numpy as np
+from tqdm import tqdm
+from util import get_statistics
+from style import bold
+import datasets
+import argparse
+from postprocess import tqdm_joblib, _load_config
+from multiprocessing import set_start_method, cpu_count
+from joblib import Parallel, delayed
+from tqdm import tqdm
 
 def get_top_k(k, X, return_sign=False):
     top_k = np.argsort(np.abs(X), axis=-1)[..., -k:][..., ::-1]
@@ -92,7 +101,6 @@ def top_k_sa_WIP(x, y, signs_x, signs_y):
     sa_scores = common_signed_features.max(axis=-1) / x.shape[1]
 
     return sa_scores
-
 
 def top_k_cdc_readable(x, y, signs_x, signs_y):
     # binary metric: 0 if any
@@ -242,3 +250,104 @@ def cosine_similarity(a, b):
     d = np.linalg.norm(a-b, axis=1)
     cosine = (1 - d**2)/2
     return cosine
+
+
+_metrics_dict = {
+    "sa": top_k_sa,
+    "ssa": top_k_ssa,
+    "cdc": top_k_cdc,
+}
+
+def _get_method_stats(idx):
+    sims = np.zeros((len(ensemble_sizes), n_inputs_exp))
+    for i, ensemble_size in enumerate(ensemble_sizes):
+        if methods[idx] in ['mode connect', 'combined'] and ensemble_size == 1:
+            sims[i] = np.nan
+        else:
+            sims[i] = average_pairwise_score(topk[idx, i], signs[idx, i], _metrics_dict[metric])
+    return sims
+
+def _get_similarities(ensemble_sizes, k, exp, metric, n_inputs_exp, directory, save=True,
+                     methods=['average', 'majority', 'perturb', 'mode connect', 'combined']):
+
+    with tqdm_joblib(tqdm(desc="Computing Statistics", total=len(methods))) as progress_bar:
+        res = Parallel(n_jobs=num_cores)(delayed(_get_method_stats)(idx) for idx in range(len(methods)))
+
+    similarities = np.zeros((len(methods), len(ensemble_sizes), n_inputs_exp))
+    for i in range(len(methods)):
+        similarities[i] = res[i]
+
+    # Save similarities and test accuracies
+    if save:
+        np.save(f'{directory}/top{k}_{metric}_{exp}.npy', similarities)
+        np.save(f'{directory}/ensemble_accs_{ensemble_sizes[0]}_to_{ensemble_sizes[-1]}.npy', test_accs)
+
+    return similarities, test_accs
+
+# Comparison of Ensemble Techniques
+if __name__ == "__main__":
+    # Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--name', type=str, default='heloc', help='dataset name')
+    parser.add_argument('--explanation', type=str, default='', help='explanation name (gradients, smoothgrad, etc.)')
+    parser.add_argument('--metric', type=str, default='sa', help='similarity metric')
+    parser.add_argument('--k', type=int, default=5, help='top-k features to consider')
+    parser.add_argument('--n_inputs_exp', type=int, default=1000, help='number of inputs to explain')
+    parser.add_argument('--n_trials', type=int, default=50, help='number of ensembles to construct')
+    parser.add_argument('--n_models', type=int, default=1000, help='number of models to sample from')
+
+    # Get config dictionary
+    args = vars(parser.parse_args())
+    name = args['name']
+    exp = args['explanation']
+    metric = args['metric']
+    k = args['k']
+    n_inputs_exp = args['n_inputs_exp']
+    n_trials = args['n_trials']
+    n_models = args['n_models']
+
+    # Ensemble sizes
+    ensemble_sizes = [1, 2, 4, 6, 8, 12, 16, 20]
+    random_source = 'rs'
+    trainset, testset = datasets.load_dataset(name)
+
+    X_test, y_test = testset.data.numpy(), testset.labels.numpy()
+    n_inputs, n_features = X_test.shape
+    n_inputs_exp = min(n_inputs_exp, n_inputs)
+    model_args = [n_features, datasets.tabular.layers[name]]
+    config = _load_config('train_params.json', name)
+    optim = 'adam'
+    epochs = config[optim]['epochs']
+    lr = config[optim]['lr']
+    batch_size = config[optim]['batch_size']
+    dropout = config[optim]['dropout']
+    directory = f'models/{name}/{random_source}/{optim}_epochs{epochs}_lr{lr}_batch{batch_size}_dropout{dropout}'
+    print(bold("Directory:"), directory)
+    print(bold("Number of features:"), n_features)
+    print(bold("Ensemble sizes:"), ensemble_sizes)
+
+    print(bold("Computing top-k statistics..."))
+    methods=['average', 'majority', 'perturb', 'mode connect', 'combined']
+    topk = np.zeros((len(methods), len(ensemble_sizes), n_trials, n_inputs_exp, k))
+    signs = np.zeros((len(methods), len(ensemble_sizes), n_trials, n_inputs_exp, k), dtype=int)
+    test_accs = np.zeros((len(methods), len(ensemble_sizes), n_trials))
+
+    for e, ensemble_size in enumerate(tqdm(ensemble_sizes)):
+        # Sample models
+        model_idx = np.random.choice(n_models, (n_trials, ensemble_size), replace=False)
+        for i in range(n_trials):
+            for j, method in enumerate(methods):
+                if method in ['mode connect', 'combined'] and ensemble_size == 1:
+                    test_accs[j, e, i] = np.nan
+                else:
+                    grads, preds = get_statistics(model_idx[i], method, directory, exp=exp)
+                    topk[j, e, i], signs[j, e, i] = get_top_k(k=k, X=grads, return_sign=True)
+                    test_accs[j, e, i] = (preds == y_test).mean()
+
+    print(bold("Running in parallel"))
+    set_start_method('spawn', force=True)
+    num_cores = cpu_count()
+    print(bold("Number of cores:"), num_cores)
+    similarities, test_accs = _get_similarities(ensemble_sizes, k, exp, metric, n_inputs_exp,
+                                               directory, save=True, methods=methods)
+    

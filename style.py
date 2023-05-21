@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from util import convert_to_numpy
 
-
 ### Helper functions
 
 # Return modified string that prints to bold
@@ -237,3 +236,61 @@ def prefix_memory(
             break
         memory /= 10**3
     return f'{round(memory, 1)}{prefix}'
+
+def plot_sim_accs(similarities, test_accs, ensemble_sizes, k, exp, metric, optim, name,
+                     methods=['average', 'majority', 'perturb', 'mode connect', 'combined']):
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(15, 5), dpi=150)
+    optim_title = optim.upper() if optim == 'sgd' else optim.title()
+    plt.suptitle(f'{exp.upper().title()} Top-{k} {metric.upper()} comparison of different ensemble methods ({name.upper()}, {optim_title})',
+                 fontweight='bold', y=1.01, fontsize=15)
+    titles = ['Average pairwise similarity', 'Test accuracy']
+    ylabs = ['Average pairwise similarity', 'Accuracy (%)']
+
+    for i, method in enumerate(methods):
+        q = np.quantile(similarities[i], [0.45, 0.5, 0.55], axis=1)
+        ax[0].plot(ensemble_sizes, q[1], label=method)
+        ax[0].fill_between(ensemble_sizes, q[0], q[2], alpha=0.2)
+        q = np.quantile(100*test_accs[i], [0.25, 0.5, 0.75], axis=1)
+        ax[1].plot(ensemble_sizes, q[0], label=method)
+        ax[1].fill_between(ensemble_sizes, q[0], q[1], alpha=0.2)
+
+    for i in range(2):
+        ax[i].set_xlabel('Ensemble size')
+        ax[i].set_xticks(ensemble_sizes)
+        ax[i].legend(loc='lower right')
+        ax[i].set_ylabel(ylabs[i])
+        ax[i].set_title(titles[i])
+
+    plt.show()
+
+metric_names = {
+    'cdc': 'Consistent Direction of Contribution',
+    'ssa': 'Signed-Set Agreement',
+    'sa': 'Sign Agreement',
+}
+
+def plot_sims(names, directories, ensemble_sizes, ks, exp, metric,
+              methods=['average', 'majority', 'perturb', 'mode connect', 'combined'],
+              colors=plt.rcParams['axes.prop_cycle'].by_key()['color'][:5]):
+    fig, ax = plt.subplots(nrows=1, ncols=len(names), figsize=(len(names)*4, 3.6), dpi=150)
+    plt.subplots_adjust(wspace=0.35)
+    method_names = ['Average', 'Majority', 'Perturb', 'Connect', 'Combine']
+    for i, name in enumerate(names):
+        k = ks[i] if isinstance(ks, list) else ks
+        similarities = np.load(f'{directories[i]}/top{k}_{metric}_{exp}.npy')[:, :len(ensemble_sizes[i]), :]
+        for j, method in enumerate(methods):
+            q = np.quantile(similarities[j], [0.45, 0.5, 0.55], axis=1)
+            ax[i].plot(ensemble_sizes[i], q[1], label=method_names[j], color=colors[j])
+            ax[i].scatter(ensemble_sizes[i], q[1], s=40, color=colors[j])
+            ax[i].fill_between(ensemble_sizes[i], q[0], q[2], alpha=0.2, color=colors[j])
+            ax[i].set_xticks(ensemble_sizes[i])
+            ax[i].set_xlabel('Number of Pre-Trained Models', fontsize=12)
+            name_title = name.title() if name not in ['heloc', 'gmsc'] else name.upper()
+            name_title = name_title + ' Credit' if name in ['german', 'default'] else name_title
+            name_title = name_title + ' Income' if name == 'adult' else name_title
+            ax[i].set_title(name_title, fontsize=14, fontweight='bold')
+            ax[i].legend()
+            ax[i].set_ylabel(f'{metric.upper()} Score', fontsize=12)
+    title = f'{exp.title()} Average Pairwise {metric_names[metric]} ({metric.upper()}) between Ensembles vs Number of Pretrained Models per Ensemble'
+    plt.suptitle(title, fontstyle='italic', fontsize=17, y=1.07)
+    plt.show()
